@@ -11,7 +11,8 @@ from transformers import AutoTokenizer, AutoModel, BertTokenizerFast, BertTokeni
 @click.command()
 @click.option('--file')
 @click.option('--batch_size', type=int, default=32)
-def index_entities(file, batch_size):
+@click.option('--num_proc', type=int, default=2)
+def index_entities(file, batch_size, num_proc):
 
     torch.set_grad_enabled(False)
 
@@ -33,22 +34,15 @@ def index_entities(file, batch_size):
 
     start = time.time()
 
-    def tokenize_function(examples):
-        output = tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
+    def tokenize_and_encode_function(examples):
+        tokenized_output = tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
+        encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
+                               attention_mask=torch.tensor(tokenized_output['attention_mask']),
+                               token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+        output = {'embeddings': encoded_output['pooler_output'].detach().numpy()}
         return output
 
-    def encode_function(examples):
-        encoded_output = model(input_ids=torch.tensor(examples['input_ids']),
-                    token_type_ids=torch.tensor(examples['token_type_ids']),
-                    attention_mask=torch.tensor(examples['attention_mask']))
-        # Use <cls> token
-        output = {'embeddings': encoded_output['pooler_output'].numpy()}
-        return output
-
-    ds_tokenized = ds.map(tokenize_function, batched=True)
-
-    print('After tokenization')
-    ds_with_embeddings = ds_tokenized.map(encode_function, batched=True, batch_size=batch_size)
+    ds_with_embeddings = ds.map(tokenize_and_encode_function, batched=True, batch_size=batch_size, num_proc=num_proc)
     print('After Encoding')
 
     ds_with_embeddings.add_faiss_index(column='embeddings')
