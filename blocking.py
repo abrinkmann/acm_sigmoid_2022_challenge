@@ -3,7 +3,7 @@ import torch
 from datasets import load_dataset
 import time
 
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, BertTokenizerFast
 
 
 
@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, AutoModel
 torch.set_grad_enabled(False)
 
 model = AutoModel.from_pretrained("bert-base-uncased")
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
 
 ds = load_dataset('csv', data_files='X1_extended.csv', split='train')
 
