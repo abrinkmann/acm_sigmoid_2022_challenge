@@ -36,11 +36,12 @@ def index_entities(file):
         return tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
 
     ds_tokenized = ds.map(tokenize_function, batched=True)
-    #ds_with_embeddings = ds_tokenized.map(lambda example: {'embeddings': model(input_ids=example['input_ids'],
-    #                                                            token_type_ids=example['token_type_ids'],
-    #                                                            attention_mask=example['attention_mask'])['pooler_output'][:, 0].numpy()})
+    #print(ds_tokenized[0])
+    ds_with_embeddings = ds_tokenized.map(lambda example: {'embeddings': model(input_ids=torch.IntTensor([example['input_ids']]),
+                                                                token_type_ids=torch.IntTensor([example['token_type_ids']]),
+                                                                attention_mask=torch.IntTensor([example['attention_mask']]))['pooler_output'][:, 0].numpy()})
 
-    #ds_with_embeddings.add_faiss_index(column='embeddings')
+    ds_with_embeddings.add_faiss_index(column='embeddings')
 
     end = time.time()
     print('With batching: ' + str(end - start))
