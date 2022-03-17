@@ -9,7 +9,8 @@ from transformers import AutoTokenizer, AutoModel, BertTokenizerFast
 
 @click.command()
 @click.option('--file')
-def index_entities(file):
+@click.option('--num_proc', type=int, default=2)
+def index_entities(file, num_proc):
 
     torch.set_grad_enabled(False)
 
@@ -31,7 +32,7 @@ def index_entities(file):
 
     start = time.time()
     ds_with_embeddings = ds.map(lambda example: {'embeddings': model(**tokenizer(example["title"], return_tensors="pt",
-                                                                                  padding=True, truncation=True, max_length=64))['pooler_output'][:, 0].detach().numpy()}, num_proc=8)
+                                                                                  padding=True, truncation=True, max_length=64))['pooler_output'][:, 0].detach().numpy()}, num_proc=num_proc)
 
     ds_with_embeddings.add_faiss_index(column='embeddings')
 
