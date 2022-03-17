@@ -10,7 +10,8 @@ from transformers import AutoTokenizer, AutoModel, BertTokenizerFast, BertTokeni
 
 @click.command()
 @click.option('--file')
-def index_entities(file):
+@click.option('--batch_size')
+def index_entities(file, batch_size):
 
     torch.set_grad_enabled(False)
 
@@ -47,7 +48,7 @@ def index_entities(file):
     ds_tokenized = ds.map(tokenize_function, batched=True)
 
     print('After tokenization')
-    ds_with_embeddings = ds_tokenized.map(encode_function, batched=True, batch_size=32)
+    ds_with_embeddings = ds_tokenized.map(encode_function, batched=True, batch_size=batch_size)
     print('After Encoding')
 
     ds_with_embeddings.add_faiss_index(column='embeddings')
