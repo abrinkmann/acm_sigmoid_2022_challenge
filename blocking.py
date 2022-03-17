@@ -43,7 +43,6 @@ def index_entities(file, batch_size, num_proc):
         return output
 
     ds_with_embeddings = ds.map(tokenize_and_encode_function, batched=True, batch_size=batch_size, num_proc=num_proc)
-    print('After Encoding')
 
     ds_with_embeddings.add_faiss_index(column='embeddings')
 
