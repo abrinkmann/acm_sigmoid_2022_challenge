@@ -33,13 +33,22 @@ def index_entities(file):
     start = time.time()
 
     def tokenize_function(examples):
-        return tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
+        output = tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
+        return output
+
+    def encode_function(examples):
+        encoded_output = model(input_ids=torch.tensor(examples['input_ids']),
+                    token_type_ids=torch.tensor(examples['token_type_ids']),
+                    attention_mask=torch.tensor(examples['attention_mask']))
+        # Use <cls> token
+        output = {'embeddings': encoded_output['pooler_output'].numpy()}
+        return output
 
     ds_tokenized = ds.map(tokenize_function, batched=True)
-    #print(ds_tokenized[0])
-    ds_with_embeddings = ds_tokenized.map(lambda example: {'embeddings': model(input_ids=torch.IntTensor([example['input_ids']]),
-                                                                token_type_ids=torch.IntTensor([example['token_type_ids']]),
-                                                                attention_mask=torch.IntTensor([example['attention_mask']]))['pooler_output'][:, 0].numpy()})
+
+    print('After tokenization')
+    ds_with_embeddings = ds_tokenized.map(encode_function, batched=True, batch_size=32)
+    print('After Encoding')
 
     ds_with_embeddings.add_faiss_index(column='embeddings')
 
