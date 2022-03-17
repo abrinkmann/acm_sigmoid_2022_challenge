@@ -5,12 +5,12 @@ import torch
 from datasets import load_dataset
 import time
 
-from transformers import AutoTokenizer, AutoModel, BertTokenizerFast
+from transformers import AutoTokenizer, AutoModel, BertTokenizerFast, BertTokenizer
+
 
 @click.command()
 @click.option('--file')
-@click.option('--num_proc', type=int, default=2)
-def index_entities(file, num_proc):
+def index_entities(file):
 
     torch.set_grad_enabled(False)
 
@@ -31,13 +31,19 @@ def index_entities(file, num_proc):
     ##################################
 
     start = time.time()
-    ds_with_embeddings = ds.map(lambda example: {'embeddings': model(**tokenizer(example["title"], return_tensors="pt",
-                                                                                  padding=True, truncation=True, max_length=64))['pooler_output'][:, 0].detach().numpy()}, num_proc=num_proc)
 
-    ds_with_embeddings.add_faiss_index(column='embeddings')
+    def tokenize_function(examples):
+        return tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
+
+    ds_tokenized = ds.map(tokenize_function, batched=True)
+    #ds_with_embeddings = ds_tokenized.map(lambda example: {'embeddings': model(input_ids=example['input_ids'],
+    #                                                            token_type_ids=example['token_type_ids'],
+    #                                                            attention_mask=example['attention_mask'])['pooler_output'][:, 0].numpy()})
+
+    #ds_with_embeddings.add_faiss_index(column='embeddings')
 
     end = time.time()
-    print('Without batching & with multiprocessing: ' + str(end - start))
+    print('With batching: ' + str(end - start))
 
     ##################################
 
