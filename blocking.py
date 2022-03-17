@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, AutoModel, BertTokenizerFast, BertTokeni
 
 @click.command()
 @click.option('--file')
-@click.option('--batch_size')
+@click.option('--batch_size', type=int, default=32)
 def index_entities(file, batch_size):
 
     torch.set_grad_enabled(False)
