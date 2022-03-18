@@ -1,68 +1,112 @@
-import logging
-
-import click
-import torch
-from datasets import load_dataset
-import time
-
-from transformers import AutoTokenizer, AutoModel, BertTokenizerFast, BertTokenizer
+from collections import defaultdict
+from tqdm import tqdm
+import pandas as pd
+import re
 
 
-@click.command()
-@click.option('--file')
-@click.option('--batch_size', type=int, default=32)
-@click.option('--num_proc', type=int, default=2)
-def index_entities(file, batch_size, num_proc):
+def block_with_attr(X, attr):  # replace with your logic.
+    '''
+    This function performs blocking using attr
+    :param X: dataframe
+    :param attr: attribute used for blocking
+    :return: candidate set of tuple pairs
+    '''
 
-    torch.set_grad_enabled(False)
+    # build index from patterns to tuples
+    pattern2id_1 = defaultdict(list)
+    pattern2id_2 = defaultdict(list)
+    for i in tqdm(range(X.shape[0])):
+        attr_i = str(X[attr][i])
+        pattern_1 = attr_i.lower()  # use the whole attribute as the pattern
+        pattern2id_1[pattern_1].append(i)
 
-    model = AutoModel.from_pretrained("bert-base-uncased")
-    tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
-
-    ds = load_dataset('csv', data_files=file, split='train')
-
-    #start = time.time()
-    #ds_with_embeddings = ds.map(lambda example: {model(**tokenizer(example["title"], return_tensors="pt",
-    #                                                                              padding=True, truncation=True, max_length=64))['pooler_output']}, batched=True, batch_size=32)
-
-    #ds_with_embeddings.add_faiss_index(column='embeddings')
-
-    #end = time.time()
-    #print('With batching: ' + str(end - start))
-
-    ##################################
-
-    start = time.time()
-
-    def tokenize_and_encode_function(examples):
-        tokenized_output = tokenizer(examples["title"], padding="max_length", truncation=True, max_length=64)
-        encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-                               attention_mask=torch.tensor(tokenized_output['attention_mask']),
-                               token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
-        output = {'embeddings': encoded_output['pooler_output'].detach().numpy()}
-        return output
-
-    ds_with_embeddings = ds.map(tokenize_and_encode_function, batched=True, batch_size=batch_size, num_proc=num_proc)
-
-    ds_with_embeddings.add_faiss_index(column='embeddings')
-
-    end = time.time()
-    print('With batching: ' + str(end - start))
-
-    ##################################
-
-    start = time.time()
-    ds_with_embeddings = ds.map(lambda example: {'embeddings': model(**tokenizer(example["title"], return_tensors="pt",
-                                                                                  padding=True, truncation=True, max_length=64))['pooler_output'][:, 0].numpy()})
-
-    ds_with_embeddings.add_faiss_index(column='embeddings')
-
-    end = time.time()
-    print('Without batching: ' + str(end - start))
+        pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
+        if len(pattern_2) == 0:
+            continue
+        pattern_2 = list(sorted(pattern_2))
+        pattern_2 = [str(it).lower() for it in pattern_2]
+        pattern2id_2[" ".join(pattern_2)].append(i)
 
 
-if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    # add id pairs that share the same pattern to candidate set
+    candidate_pairs_1 = []
+    for pattern in tqdm(pattern2id_1):
+        ids = list(sorted(pattern2id_1[pattern]))
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                candidate_pairs_1.append((ids[i], ids[j])) #
+    # add id pairs that share the same pattern to candidate set
+    candidate_pairs_2 = []
+    for pattern in tqdm(pattern2id_2):
+        ids = list(sorted(pattern2id_2[pattern]))
+        if len(ids)<100: #skip patterns that are too common
+            for i in range(len(ids)):
+                for j in range(i + 1, len(ids)):
+                    candidate_pairs_2.append((ids[i], ids[j]))
 
-    index_entities()
+    # remove duplicate pairs and take union
+    candidate_pairs = set(candidate_pairs_2)
+    candidate_pairs = candidate_pairs.union(set(candidate_pairs_1))
+    candidate_pairs = list(candidate_pairs)
+
+    # sort candidate pairs by jaccard similarity.
+    # In case we have more than 1000000 pairs (or 2000000 pairs for the second dataset),
+    # sort the candidate pairs to put more similar pairs first,
+    # so that when we keep only the first 1000000 pairs we are keeping the most likely pairs
+    jaccard_similarities = []
+    candidate_pairs_real_ids = []
+    for it in tqdm(candidate_pairs):
+        id1, id2 = it
+
+        # get real ids
+        real_id1 = X['id'][id1]
+        real_id2 = X['id'][id2]
+        if real_id1<real_id2: # NOTE: This is to make sure in the final output.csv, for a pair id1 and id2 (assume id1<id2), we only include (id1,id2) but not (id2, id1)
+            candidate_pairs_real_ids.append((real_id1, real_id2))
+        else:
+            candidate_pairs_real_ids.append((real_id2, real_id1))
+
+        # compute jaccard similarity
+        name1 = str(X[attr][id1])
+        name2 = str(X[attr][id2])
+        s1 = set(name1.lower().split())
+        s2 = set(name2.lower().split())
+        jaccard_similarities.append(len(s1.intersection(s2)) / max(len(s1), len(s2)))
+    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+    return candidate_pairs_real_ids
+
+
+def save_output(X1_candidate_pairs,
+                X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
+    expected_cand_size_X1 = 1000000
+    expected_cand_size_X2 = 2000000
+
+    # make sure to include exactly 1000000 pairs for dataset X1 and 2000000 pairs for dataset X2
+    if len(X1_candidate_pairs) > expected_cand_size_X1:
+        X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
+    if len(X2_candidate_pairs) > expected_cand_size_X2:
+        X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
+
+    # make sure to include exactly 1000000 pairs for dataset X1 and 2000000 pairs for dataset X2
+    if len(X1_candidate_pairs) < expected_cand_size_X1:
+        X1_candidate_pairs.extend([(0, 0)] * (expected_cand_size_X1 - len(X1_candidate_pairs)))
+    if len(X2_candidate_pairs) < expected_cand_size_X2:
+        X2_candidate_pairs.extend([(0, 0)] * (expected_cand_size_X2 - len(X2_candidate_pairs)))
+
+    all_cand_pairs = X1_candidate_pairs + X2_candidate_pairs  # make sure to have the pairs in the first dataset first
+    output_df = pd.DataFrame(all_cand_pairs, columns=["left_instance_id", "right_instance_id"])
+    # In evaluation, we expect output.csv to include exactly 3000000 tuple pairs.
+    # we expect the first 1000000 pairs are for dataset X1, and the remaining pairs are for dataset X2
+    output_df.to_csv("output.csv", index=False)
+
+
+# read the datasets
+X1 = pd.read_csv("X1.csv")
+X2 = pd.read_csv("X2.csv")
+
+# perform blocking
+X1_candidate_pairs = block_with_attr(X1, attr="title")
+X2_candidate_pairs = block_with_attr(X2, attr="name")
+
+# save results
+save_output(X1_candidate_pairs, X2_candidate_pairs)
