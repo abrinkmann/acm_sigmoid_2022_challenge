@@ -65,6 +65,7 @@ def index_entities(file, batch_size, num_proc, local_rank):
     num_cpus = psutil.cpu_count(logical=True)
     print('Number of available CPUs:', num_cpus)
 
+
     # Start Ray cluster
     ray.init(num_cpus=num_cpus, ignore_reinit_error=True)
 
