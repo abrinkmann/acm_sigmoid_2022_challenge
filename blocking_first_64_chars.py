@@ -17,7 +17,7 @@ def block_with_attr(X, attr):  # replace with your logic.
     pattern2id_2 = defaultdict(list)
     for i in tqdm(range(X.shape[0])):
         attr_i = str(X[attr][i])
-        pattern_1 = attr_i.lower()[:128]  # use the whole attribute as the pattern
+        pattern_1 = attr_i.lower()[:64]  # use the first 64 chars as pattern
         pattern2id_1[pattern_1].append(i)
 
         # pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
