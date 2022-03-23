@@ -20,12 +20,12 @@ def block_with_attr(X, attr):  # replace with your logic.
         pattern_1 = attr_i.lower()[:64]  # use the first 64 chars as pattern
         pattern2id_1[pattern_1].append(i)
 
-        # pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
-        # if len(pattern_2) == 0:
-        #     continue
-        # pattern_2 = list(sorted(pattern_2))
-        # pattern_2 = [str(it).lower() for it in pattern_2]
-        # pattern2id_2[" ".join(pattern_2)].append(i)
+        pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
+        if len(pattern_2) == 0:
+            continue
+        pattern_2 = list(sorted(pattern_2))
+        pattern_2 = [str(it).lower() for it in pattern_2]
+        pattern2id_2[" ".join(pattern_2)].append(i)
 
 
     # add id pairs that share the same pattern to candidate set
@@ -36,18 +36,18 @@ def block_with_attr(X, attr):  # replace with your logic.
             for j in range(i + 1, len(ids)):
                 candidate_pairs_1.append((ids[i], ids[j])) #
     # # add id pairs that share the same pattern to candidate set
-    # candidate_pairs_2 = []
-    # for pattern in tqdm(pattern2id_2):
-    #     ids = list(sorted(pattern2id_2[pattern]))
-    #     if len(ids)<100: #skip patterns that are too common
-    #         for i in range(len(ids)):
-    #             for j in range(i + 1, len(ids)):
-    #                 candidate_pairs_2.append((ids[i], ids[j]))
+    candidate_pairs_2 = []
+    for pattern in tqdm(pattern2id_2):
+        ids = list(sorted(pattern2id_2[pattern]))
+        if len(ids)<100: #skip patterns that are too common
+            for i in range(len(ids)):
+                for j in range(i + 1, len(ids)):
+                    candidate_pairs_2.append((ids[i], ids[j]))
 
     # remove duplicate pairs and take union
-    #candidate_pairs = set(candidate_pairs_2)
-    #candidate_pairs = candidate_pairs.union(set(candidate_pairs_1))
-    candidate_pairs = list(set(candidate_pairs_1))
+    candidate_pairs = set(candidate_pairs_2)
+    candidate_pairs = candidate_pairs.union(set(candidate_pairs_1))
+    candidate_pairs = list(set(candidate_pairs))
 
     # sort candidate pairs by jaccard similarity.
     # In case we have more than 1000000 pairs (or 2000000 pairs for the second dataset),
