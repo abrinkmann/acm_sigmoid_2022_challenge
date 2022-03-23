@@ -1,13 +1,11 @@
-import itertools
 import logging
-import os
 from datetime import datetime
 
 import click
 import numpy
 import pandas as pd
 import torch
-from datasets import load_dataset, Dataset
+from datasets import Dataset
 
 from transformers import AutoTokenizer, AutoModel
 
