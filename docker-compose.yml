@@ -1,13 +1,13 @@
 version: '2.2'
 services:
-  es01:
+  acm_es01:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
-    container_name: es01
+    container_name: acm_es01
     environment:
-      - node.name=es01
-      - cluster.name=es-docker-cluster
-      - discovery.seed_hosts=es02,es03
-      - cluster.initial_master_nodes=es01,es02,es03
+      - node.name=acm_es01
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=acm_es02,acm_es03
+      - cluster.initial_master_nodes=acm_es01,acm_es02,acm_es03
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms4g -Xmx4g"
     ulimits:
@@ -21,14 +21,14 @@ services:
     networks:
       - elastic
 
-  es02:
+  acm_es02:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
     container_name: es02
     environment:
       - node.name=es02
-      - cluster.name=es-docker-cluster
-      - discovery.seed_hosts=es01,es03
-      - cluster.initial_master_nodes=es01,es02,es03
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=acm_es01,acm_es03
+      - cluster.initial_master_nodes=acm_es01,acm_es02,acm_es03
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
     ulimits:
@@ -40,14 +40,14 @@ services:
     networks:
       - elastic
 
-  es03:
+  acm_es03:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
     container_name: es03
     environment:
       - node.name=es03
-      - cluster.name=es-docker-cluster
-      - discovery.seed_hosts=es01,es02
-      - cluster.initial_master_nodes=es01,es02,es03
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=acm_es01,acm_es02
+      - cluster.initial_master_nodes=acm_es01,acm_es02,acm_es03
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
     ulimits:
@@ -56,17 +56,6 @@ services:
         hard: -1
     volumes:
       - esdata03:/usr/share/elasticsearch/data
-    networks:
-      - elastic
-
-  kib01:
-    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
-    container_name: kib01
-    ports:
-      - 5601:5601
-    environment:
-      ELASTICSEARCH_URL: http://es01:9200
-      ELASTICSEARCH_HOSTS: '["http://es01:9200","http://es02:9200","http://es03:9200"]'
     networks:
       - elastic
 
