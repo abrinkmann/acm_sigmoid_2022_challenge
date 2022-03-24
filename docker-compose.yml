@@ -23,9 +23,9 @@ services:
 
   acm_es02:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
-    container_name: es02
+    container_name: acm_es02
     environment:
-      - node.name=es02
+      - node.name=acm_es02
       - cluster.name=${CLUSTER_NAME}
       - discovery.seed_hosts=acm_es01,acm_es03
       - cluster.initial_master_nodes=acm_es01,acm_es02,acm_es03
@@ -42,9 +42,9 @@ services:
 
   acm_es03:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
-    container_name: es03
+    container_name: acm_es03
     environment:
-      - node.name=es03
+      - node.name=acm_es03
       - cluster.name=${CLUSTER_NAME}
       - discovery.seed_hosts=acm_es01,acm_es02
       - cluster.initial_master_nodes=acm_es01,acm_es02,acm_es03
