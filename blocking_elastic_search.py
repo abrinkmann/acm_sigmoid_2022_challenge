@@ -21,7 +21,7 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
 
     logger = logging.getLogger()
     # connect to elastic search - Use existing elastic search instance for now
-    _es = Elasticsearch(['http://localhost:9200'])
+    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
     while not _es.ping():
         # Wait until es is up and running
         time.sleep(5)
@@ -86,24 +86,25 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
     for it in tqdm(candidate_pairs):
         id1, id2 = it
 
-        # get real ids
-        real_id1 = X['id'][id1]
-        real_id2 = X['id'][id2]
-        if real_id1<real_id2: # NOTE: This is to make sure in the final output.csv, for a pair id1 and id2 (assume id1<id2), we only include (id1,id2) but not (id2, id1)
-            candidate_pairs_real_ids.append((real_id1, real_id2))
-        else:
-            candidate_pairs_real_ids.append((real_id2, real_id1))
-
         # compute jaccard similarity
         name1 = str(X[attr][id1])
         name2 = str(X[attr][id2])
         s1 = set(name1.lower().split())
         s2 = set(name2.lower().split())
-        jaccard_similarities.append(len(s1.intersection(s2)) / max(len(s1), len(s2)))
+        jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
+        if jaccard_sim > 0.15:
+            jaccard_similarities.append(jaccard_sim)
+            # get real ids
+            real_id1 = X['id'][id1]
+            real_id2 = X['id'][id2]
+            if real_id1 < real_id2:  # NOTE: This is to make sure in the final output.csv, for a pair id1 and id2 (assume id1<id2), we only include (id1,id2) but not (id2, id1)
+                candidate_pairs_real_ids.append((real_id1, real_id2))
+            else:
+                candidate_pairs_real_ids.append((real_id2, real_id1))
+
     candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
     return candidate_pairs_real_ids
     #return candidate_pairs_real_ids
-
 
 def determine_transitive_matches(candidate_pairs):
     change = True
@@ -145,7 +146,7 @@ def generate_products(X):
 
 def query_elastic(index_name, index, search_dict, attr_name):
     """Query elastic search"""
-    _es = Elasticsearch(['http://localhost:9200'])
+    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
     should_match_list = [{"match": {attr.lower(): search_dict[attr]}} for attr in search_dict
                          if attr != 'id' and not (type(search_dict[attr]) is float and np.isnan(search_dict[attr]))]
     query_body = {
