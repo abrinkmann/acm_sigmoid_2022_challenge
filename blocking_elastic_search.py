@@ -21,7 +21,7 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
 
     logger = logging.getLogger()
     # connect to elastic search - Use existing elastic search instance for now
-    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
+    _es = Elasticsearch(['http://localhost:9200'])
     while not _es.ping():
         # Wait until es is up and running
         time.sleep(5)
