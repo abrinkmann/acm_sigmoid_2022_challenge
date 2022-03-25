@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from collections import defaultdict
 from multiprocessing import Pool
@@ -21,7 +22,7 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
 
     logger = logging.getLogger()
     # connect to elastic search - Use existing elastic search instance for now
-    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
+    _es = Elasticsearch(['http://{}:9200'.format(os.environ['ES_CLIENT'])])
     while not _es.ping():
         # Wait until es is up and running
         time.sleep(5)
@@ -146,7 +147,7 @@ def generate_products(X):
 
 def query_elastic(index_name, index, search_dict, attr_name):
     """Query elastic search"""
-    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
+    _es = Elasticsearch(['http://{}:9200'.format(os.environ['ES_CLIENT'])])
     should_match_list = [{"match": {attr.lower(): search_dict[attr]}} for attr in search_dict
                          if attr != 'id' and not (type(search_dict[attr]) is float and np.isnan(search_dict[attr]))]
     query_body = {
