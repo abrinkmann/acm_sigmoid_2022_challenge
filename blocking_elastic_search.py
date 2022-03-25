@@ -145,7 +145,7 @@ def generate_products(X):
 
 def query_elastic(index_name, index, search_dict, attr_name):
     """Query elastic search"""
-    _es = Elasticsearch(['http://wifo5-33.informatik.uni-mannheim.de:9200'])
+    _es = Elasticsearch(['http://localhost:9200'])
     should_match_list = [{"match": {attr.lower(): search_dict[attr]}} for attr in search_dict
                          if attr != 'id' and not (type(search_dict[attr]) is float and np.isnan(search_dict[attr]))]
     query_body = {
