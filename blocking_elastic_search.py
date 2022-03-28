@@ -45,7 +45,7 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
     logger.info("Indexed %d/%d documents" % (successes, number_of_products))
     progress.close()
 
-    _es.cluster.health(wait_for_status='green')
+    _es.cluster.health(wait_for_status='green', request_timeout=30)
     # Search matches for each candidate
     logger.info("Start querying ES")
     candidate_pairs = set()
@@ -216,3 +216,5 @@ if __name__ == '__main__':
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
+    logger = logging.getLogger()
+    logger.info('Candidates saved!')
