@@ -45,7 +45,7 @@ def block_with_elastic(X, index_name, attr):  # replace with your logic.
     logger.info("Indexed %d/%d documents" % (successes, number_of_products))
     progress.close()
 
-    _es.cluster.health(wait_for_status='green', request_timeout=30)
+    #_es.cluster.health(wait_for_status='green', request_timeout=30)
     # Search matches for each candidate
     logger.info("Start querying ES")
     candidate_pairs = set()
