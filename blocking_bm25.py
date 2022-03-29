@@ -1,20 +1,14 @@
-import json
+import itertools
 import logging
-import os
-import time
-from collections import defaultdict
-from multiprocessing import Pool
 
 import numpy as np
-from elasticsearch import Elasticsearch
-from elasticsearch.helpers import streaming_bulk
 from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
 
 
 
-def block_with_bm25(X, index_name, attr):  # replace with your logic.
+def block_with_bm25(X, attr):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -23,73 +17,105 @@ def block_with_bm25(X, index_name, attr):  # replace with your logic.
 
     logger = logging.getLogger()
 
-    logger.info('Elastic Search is up and running!')
-
     logger.info("Indexing products...")
-    # for index, row in X.iterrows():
-    #     doc = {key: value for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))}
-    #     _es.index(index=index_name, id=index, document=doc)
 
-    X['tokenized'] = X.apply(lambda row: generate_tokenize_input(row), axis=1)
-    bm25 = BM25Okapi(X['tokenized'].values)
+    X['preprocessed'] = X.apply(lambda row: preprocess_input(row), axis=1)
+    X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
+    #print(X_grouped.columns)
+    #print(X_grouped['ids'].head())
+    #print(len(X_grouped))
+
+    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenize_input(row['preprocessed']), axis=1)
+    bm25 = BM25Okapi(X_grouped['tokenized'].values)
     k = 10
 
     logger.info("Searching products...")
-    candidate_pairs = []
+    candidate_group_pairs = []
     #counter = 0
-    for index, row in tqdm(X.iterrows()):
+    for index, row in tqdm(X_grouped.iterrows()):
         doc_scores = bm25.get_scores(row['tokenized'])
         for top_id in np.argsort(doc_scores)[::-1][:k]:
             if index != top_id:
                 normalized_score = doc_scores[top_id]/ np.amax(doc_scores)
-                if normalized_score < 0.33:
+                if normalized_score < 0.1:
                     break
 
                 s1 = set(row['tokenized'])
-                s2 = set(X.iloc[top_id]['tokenized'])
+                s2 = set(X_grouped.iloc[top_id]['tokenized'])
                 jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
-                if jaccard_sim < 0.2:
+                if jaccard_sim < 0.15:
                     # Filter unlikely pairs with jaccard below or equal to 0.2
                     #counter += 1
                     continue
 
                 if index < top_id:
-                    candidate_pairs.append((index, top_id))
+                    candidate_group_pair = (index, top_id, normalized_score)
                 elif index > top_id:
-                    candidate_pairs.append((top_id, index))
+                    candidate_group_pair = (top_id, index, normalized_score)
+                else:
+                    continue
 
-    #logger.info('Counted {} examples'.format(str(counter)))
-    candidate_pairs = list(set(candidate_pairs))
-    candidate_pairs = determine_transitive_matches(list(candidate_pairs))
+                candidate_group_pairs.append(candidate_group_pair)
 
-    # sort candidate pairs by jaccard similarity.
+    candidate_group_pair_dict = {}
+    for candidate_group_pair in candidate_group_pairs:
+        pair = (candidate_group_pair[0], candidate_group_pair[1])
+        if pair in candidate_group_pair_dict:
+            if candidate_group_pair_dict[pair] < candidate_group_pair[2]:
+                candidate_group_pair_dict[pair] = candidate_group_pair[2]
+        else:
+            candidate_group_pair_dict[pair] = candidate_group_pair[2]
+    #candidate_group_pairs = list(set(candidate_group_pairs))
+    #candidate_pairs = determine_transitive_matches(list(candidate_pairs))
+
+    # sort candidate pairs by normalized BM25 similarity.
     # In case we have more than 1000000 pairs (or 2000000 pairs for the second dataset),
     # sort the candidate pairs to put more similar pairs first,
     # so that when we keep only the first 1000000 pairs we are keeping the most likely pairs
-    jaccard_similarities = []
+    normalized_similarities = []
     candidate_pairs_real_ids = []
-    for it in tqdm(candidate_pairs):
-        id1, id2 = it
+    # Add candidates from grouping
+    for candidate_list in X_grouped['ids']:
+        if len(candidate_list) > 1:
+            candidate_pairs = []
+            for real_id1, real_id2 in itertools.permutations(candidate_list, 2):
+                if real_id1 < real_id2:
+                    candidate_pair = (real_id1, real_id2)
+                elif real_id1 > real_id2:
+                    candidate_pair = (real_id2, real_id1)
+                else:
+                    continue
+                candidate_pairs.append(candidate_pair)
 
-        # compute jaccard similarity
-        name1 = str(X[attr][id1])
-        name2 = str(X[attr][id2])
-        s1 = set(name1.lower().split())
-        s2 = set(name2.lower().split())
-        jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
-        if jaccard_sim > 0.15:
-            jaccard_similarities.append(jaccard_sim)
-            # get real ids
-            real_id1 = X['id'][id1]
-            real_id2 = X['id'][id2]
-            if real_id1 < real_id2:  # NOTE: This is to make sure in the final output.csv, for a pair id1 and id2 (assume id1<id2), we only include (id1,id2) but not (id2, id1)
-                candidate_pairs_real_ids.append((real_id1, real_id2))
+            candidate_pairs = list(set(candidate_pairs))
+            for candidate_pair in candidate_pairs:
+                candidate_pairs_real_ids.append(candidate_pair)
+                normalized_similarities.append(1.0)
+
+
+    # Add candidates from BM25 retrieval
+    for pair, normalized_score in tqdm(candidate_group_pair_dict.items()):
+        id1, id2 = pair
+
+        # Determine real ids
+
+        real_group_ids_1 = X_grouped['ids'][id1]
+        real_group_ids_2 = X_grouped['ids'][id2]
+
+        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+            if real_id1 < real_id2:
+                candidate_pair = (real_id1, real_id2)
+            elif real_id1 > real_id2:
+                candidate_pair = (real_id2, real_id1)
             else:
-                candidate_pairs_real_ids.append((real_id2, real_id1))
+                continue
+            candidate_pairs_real_ids.append(candidate_pair)
+            normalized_similarities.append(normalized_score)
 
-    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+    candidate_pairs_real_ids = [x for _, x in sorted(zip(normalized_similarities, candidate_pairs_real_ids), reverse=True)]
     return candidate_pairs_real_ids
     #return candidate_pairs_real_ids
+
 
 def determine_transitive_matches(candidate_pairs):
     change = True
@@ -123,44 +149,16 @@ def determine_transitive_matches(candidate_pairs):
     return new_candidate_pairs
 
 
-def generate_tokenize_input(row):
-    doc = ' '.join([str(value) for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))])
-    tokenized_doc = doc.lower().split(' ')
-    return tokenized_doc
+def preprocess_input(row):
+    # To-Do: Improve tokenizer
+    doc = ' '.join(
+        [str(value) for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])[:64]
+    return doc
 
 
-def query_elastic(index_name, index, search_dict, attr_name):
-    """Query elastic search"""
-    _es = Elasticsearch(['http://{}:9200'.format(os.environ['ES_CLIENT'])])
-    should_match_list = [{"match": {attr.lower(): search_dict[attr]}} for attr in search_dict
-                         if attr != 'id' and not (type(search_dict[attr]) is float and np.isnan(search_dict[attr]))]
-    query_body = {
-        "bool": {"should": should_match_list}
-    }
-    search_result = _es.search(query=query_body, index=index_name, request_timeout=30)
-    max_score = search_result.body['hits']['max_score']
-    candidate_pairs = []
-    for hit in search_result.body['hits']['hits']:
-        if hit['_score'] / max_score < 0.33:
-            # Only consider hits with a normalized similarity above 0.33
-            break
-
-        s1 = set(search_dict[attr_name].lower().split())
-        s2 = set(hit['_source'][attr_name].lower().split())
-        jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
-        if jaccard_sim <= 0.2:
-            # Filter unlikely pairs with jaccard below or equal to 0.2
-            break
-
-        result_id = int(hit['_id'])
-
-        # Order ids by size --> Do not add rows with same id.
-        if index < result_id:
-            candidate_pairs.append((index, result_id))
-        elif index > result_id:
-            candidate_pairs.append((result_id, index))
-
-    return candidate_pairs
+def generate_tokenize_input(preprocessed):
+    tokenized = preprocessed.lower().split(' ')
+    return tokenized
 
 
 def save_output(X1_candidate_pairs,
@@ -195,8 +193,8 @@ if __name__ == '__main__':
     X2 = pd.read_csv("X2.csv")
 
     # perform blocking
-    X1_candidate_pairs = block_with_bm25(X1, 'x1', attr="title")
-    X2_candidate_pairs = block_with_bm25(X2, 'x2', attr="name")
+    X1_candidate_pairs = block_with_bm25(X1, attr="title")
+    X2_candidate_pairs = block_with_bm25(X2, attr="name")
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
