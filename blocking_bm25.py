@@ -1,14 +1,16 @@
 import itertools
 import logging
+import time
 
 import numpy as np
+from multiprocess.pool import Pool
 from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
 
 
 
-def block_with_bm25(X, attr):  # replace with your logic.
+def block_with_bm25(path_to_X, attr):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -16,6 +18,9 @@ def block_with_bm25(X, attr):  # replace with your logic.
     '''
 
     logger = logging.getLogger()
+
+    logger.info("Load dataset...")
+    X = pd.read_csv(path_to_X)
 
     logger.info("Indexing products...")
 
@@ -37,16 +42,16 @@ def block_with_bm25(X, attr):  # replace with your logic.
         for top_id in np.argsort(doc_scores)[::-1][:k]:
             if index != top_id:
                 normalized_score = doc_scores[top_id]/ np.amax(doc_scores)
-                if normalized_score < 0.1:
+                if normalized_score < 0.2:
                     break
 
-                s1 = set(row['tokenized'])
-                s2 = set(X_grouped.iloc[top_id]['tokenized'])
-                jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
-                if jaccard_sim < 0.15:
-                    # Filter unlikely pairs with jaccard below or equal to 0.2
-                    #counter += 1
-                    continue
+                # s1 = set(row['tokenized'])
+                # s2 = set(X_grouped.iloc[top_id]['tokenized'])
+                # jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
+                # if jaccard_sim < 0.15:
+                #     # Filter unlikely pairs with jaccard below or equal to 0.2
+                #     #counter += 1
+                #     continue
 
                 if index < top_id:
                     candidate_group_pair = (index, top_id, normalized_score)
@@ -56,6 +61,8 @@ def block_with_bm25(X, attr):  # replace with your logic.
                     continue
 
                 candidate_group_pairs.append(candidate_group_pair)
+
+    #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
 
     candidate_group_pair_dict = {}
     for candidate_group_pair in candidate_group_pairs:
@@ -188,13 +195,24 @@ def save_output(X1_candidate_pairs,
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
-    # read the datasets
-    X1 = pd.read_csv("X1.csv")
-    X2 = pd.read_csv("X2.csv")
 
-    # perform blocking
-    X1_candidate_pairs = block_with_bm25(X1, attr="title")
-    X2_candidate_pairs = block_with_bm25(X2, attr="name")
+    pool = Pool(2)
+    result_1 = pool.apply_async(block_with_bm25, ("X1.csv", "title",))
+    result_2 = pool.apply_async(block_with_bm25, ("X2.csv", "name",))
+
+    X1_candidate_pairs = None
+    X2_candidate_pairs = None
+    while X1_candidate_pairs is None or X2_candidate_pairs is None:
+        if result_1.ready():
+            X1_candidate_pairs = result_1.get()
+        if result_2.ready():
+            X2_candidate_pairs = result_2.get()
+
+        if X1_candidate_pairs is None or X2_candidate_pairs is None:
+            time.sleep(10)
+
+    pool.close()
+    pool.join()
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
