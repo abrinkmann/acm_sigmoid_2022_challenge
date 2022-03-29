@@ -20,12 +20,12 @@ def block_with_attr(X, attr):  # replace with your logic.
         pattern_1 = attr_i.lower()[:64]  # use the first 64 chars as pattern
         pattern2id_1[pattern_1].append(i)
 
-        pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
-        if len(pattern_2) == 0:
-            continue
-        pattern_2 = list(sorted(pattern_2))
-        pattern_2 = [str(it).lower() for it in pattern_2]
-        pattern2id_2[" ".join(pattern_2)].append(i)
+        # pattern_2 = re.findall("\w+\s\w+\d+", attr_i)  # look for patterns like "thinkpad x1"
+        # if len(pattern_2) == 0:
+        #     continue
+        # pattern_2 = list(sorted(pattern_2))
+        # pattern_2 = [str(it).lower() for it in pattern_2]
+        # pattern2id_2[" ".join(pattern_2)].append(i)
 
 
     # add id pairs that share the same pattern to candidate set

@@ -4,6 +4,7 @@ import time
 
 import numpy as np
 from multiprocess.pool import Pool
+from psutil import cpu_count
 from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
@@ -30,84 +31,67 @@ def block_with_bm25(path_to_X, attr):  # replace with your logic.
     #print(X_grouped['ids'].head())
     #print(len(X_grouped))
 
-    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenize_input(row['preprocessed']), axis=1)
-    bm25 = BM25Okapi(X_grouped['tokenized'].values)
+    # Introduce multiprocessing!
+    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
     k = 10
 
     logger.info("Searching products...")
     candidate_group_pairs = []
-    #counter = 0
-    for index, row in tqdm(X_grouped.iterrows()):
-        doc_scores = bm25.get_scores(row['tokenized'])
-        for top_id in np.argsort(doc_scores)[::-1][:k]:
-            if index != top_id:
-                normalized_score = doc_scores[top_id]/ np.amax(doc_scores)
-                if normalized_score < 0.2:
-                    break
+    worker = cpu_count()
+    pool = Pool(worker)
+    results = []
 
-                # s1 = set(row['tokenized'])
-                # s2 = set(X_grouped.iloc[top_id]['tokenized'])
-                # jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
-                # if jaccard_sim < 0.15:
-                #     # Filter unlikely pairs with jaccard below or equal to 0.2
-                #     #counter += 1
-                #     continue
+    multiprocessing_step_size = int((X_grouped.shape[0] / worker)) + 1
+    start = 0
+    logger.info('Start search!')
+    while start < X_grouped.shape[0]:
+        value_range = (start, start+multiprocessing_step_size)
+        results.append(
+            pool.apply_async(search_bm25, (value_range, X_grouped, k,)))
 
-                if index < top_id:
-                    candidate_group_pair = (index, top_id, normalized_score)
-                elif index > top_id:
-                    candidate_group_pair = (top_id, index, normalized_score)
-                else:
-                    continue
+        start += multiprocessing_step_size
 
-                candidate_group_pairs.append(candidate_group_pair)
+    # Prepare pairs deduced from groups while waiting for search results
+    candidate_pairs_real_ids = []
+    # Add candidates from grouping
+    for i in tqdm(range(X_grouped.shape[0])):
+        ids = list(sorted(X_grouped['ids'][i]))
+        if len(ids) > 1:
+            for j in range(len(ids)):
+                for k in range(j + 1, len(ids)):
+                    candidate_pairs_real_ids.append((ids[j], ids[k]))
 
+    jaccard_similarities = [1.0] * len(candidate_pairs_real_ids)
+
+    # Collect search results
+    logger.info('Collect search results!')
+    while len(results) > 0:
+        collected_results = []
+        for result in results:
+            if result.ready():
+                candidate_group_pair = result.get()
+                candidate_group_pairs.extend(candidate_group_pair)
+                collected_results.append(result)
+
+        results = [result for result in results if result not in collected_results]
+
+    candidate_group_pairs = list(set(candidate_group_pairs))
     #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
-
-    candidate_group_pair_dict = {}
-    for candidate_group_pair in candidate_group_pairs:
-        pair = (candidate_group_pair[0], candidate_group_pair[1])
-        if pair in candidate_group_pair_dict:
-            if candidate_group_pair_dict[pair] < candidate_group_pair[2]:
-                candidate_group_pair_dict[pair] = candidate_group_pair[2]
-        else:
-            candidate_group_pair_dict[pair] = candidate_group_pair[2]
-    #candidate_group_pairs = list(set(candidate_group_pairs))
     #candidate_pairs = determine_transitive_matches(list(candidate_pairs))
 
-    # sort candidate pairs by normalized BM25 similarity.
+    # sort candidate pairs by jaccard similarity.
     # In case we have more than 1000000 pairs (or 2000000 pairs for the second dataset),
     # sort the candidate pairs to put more similar pairs first,
     # so that when we keep only the first 1000000 pairs we are keeping the most likely pairs
-    normalized_similarities = []
-    candidate_pairs_real_ids = []
-    # Add candidates from grouping
-    for candidate_list in X_grouped['ids']:
-        if len(candidate_list) > 1:
-            candidate_pairs = []
-            for real_id1, real_id2 in itertools.permutations(candidate_list, 2):
-                if real_id1 < real_id2:
-                    candidate_pair = (real_id1, real_id2)
-                elif real_id1 > real_id2:
-                    candidate_pair = (real_id2, real_id1)
-                else:
-                    continue
-                candidate_pairs.append(candidate_pair)
-
-            candidate_pairs = list(set(candidate_pairs))
-            for candidate_pair in candidate_pairs:
-                candidate_pairs_real_ids.append(candidate_pair)
-                normalized_similarities.append(1.0)
-
 
     # Add candidates from BM25 retrieval
-    for pair, normalized_score in tqdm(candidate_group_pair_dict.items()):
+    for pair in tqdm(candidate_group_pairs):
         id1, id2 = pair
 
         # Determine real ids
 
-        real_group_ids_1 = X_grouped['ids'][id1]
-        real_group_ids_2 = X_grouped['ids'][id2]
+        real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
+        real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
 
         for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
             if real_id1 < real_id2:
@@ -117,11 +101,39 @@ def block_with_bm25(path_to_X, attr):  # replace with your logic.
             else:
                 continue
             candidate_pairs_real_ids.append(candidate_pair)
-            normalized_similarities.append(normalized_score)
 
-    candidate_pairs_real_ids = [x for _, x in sorted(zip(normalized_similarities, candidate_pairs_real_ids), reverse=True)]
+            # Calculate jaccard similarity
+            s1 = set(X_grouped['tokenized'][id1])
+            s2 = set(X_grouped['tokenized'][id2])
+            jaccard_similarities.append(len(s1.intersection(s2)) / max(len(s1), len(s2)))
+
+    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
     return candidate_pairs_real_ids
     #return candidate_pairs_real_ids
+
+
+def search_bm25(value_range, X_grouped, k):
+    bm25 = BM25Okapi(X_grouped['tokenized'].values)
+    candidate_group_pairs = []
+
+    for index in range(value_range[0], value_range[1]):
+        if index < X_grouped.shape[0]:
+            doc_scores = bm25.get_scores(X_grouped['tokenized'][index])
+            for top_id in np.argsort(doc_scores)[::-1][:k]:
+                if index != top_id:
+                    normalized_score = doc_scores[top_id] / np.amax(doc_scores)
+                    if normalized_score < 0.33:
+                        break
+
+                    if index < top_id:
+                        candidate_group_pair = (index, top_id)
+                    elif index > top_id:
+                        candidate_group_pair = (top_id, index)
+                    else:
+                        continue
+
+                    candidate_group_pairs.append(candidate_group_pair)
+    return candidate_group_pairs
 
 
 def determine_transitive_matches(candidate_pairs):
@@ -163,7 +175,7 @@ def preprocess_input(row):
     return doc
 
 
-def generate_tokenize_input(preprocessed):
+def generate_tokenized_input(preprocessed):
     tokenized = preprocessed.lower().split(' ')
     return tokenized
 
@@ -196,23 +208,8 @@ if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    pool = Pool(2)
-    result_1 = pool.apply_async(block_with_bm25, ("X1.csv", "title",))
-    result_2 = pool.apply_async(block_with_bm25, ("X2.csv", "name",))
-
-    X1_candidate_pairs = None
-    X2_candidate_pairs = None
-    while X1_candidate_pairs is None or X2_candidate_pairs is None:
-        if result_1.ready():
-            X1_candidate_pairs = result_1.get()
-        if result_2.ready():
-            X2_candidate_pairs = result_2.get()
-
-        if X1_candidate_pairs is None or X2_candidate_pairs is None:
-            time.sleep(10)
-
-    pool.close()
-    pool.join()
+    X1_candidate_pairs = block_with_bm25("X1.csv", "title")
+    X2_candidate_pairs = block_with_bm25("X2.csv", "name")
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
