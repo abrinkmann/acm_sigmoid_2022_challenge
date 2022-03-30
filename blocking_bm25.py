@@ -1,5 +1,6 @@
 import itertools
 import logging
+import re
 import time
 
 import numpy as np
@@ -11,7 +12,7 @@ import pandas as pd
 
 
 
-def block_with_bm25(path_to_X, attr):  # replace with your logic.
+def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -24,8 +25,8 @@ def block_with_bm25(path_to_X, attr):  # replace with your logic.
     X = pd.read_csv(path_to_X)
 
     logger.info("Indexing products...")
-
-    X['preprocessed'] = X.apply(lambda row: preprocess_input(row), axis=1)
+    X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words, normalization), axis=1)
+    X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
     X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
     #print(X_grouped.columns)
     #print(X_grouped['ids'].head())
@@ -33,7 +34,7 @@ def block_with_bm25(path_to_X, attr):  # replace with your logic.
 
     # Introduce multiprocessing!
     X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
-    k = 10
+    k = 2
 
     logger.info("Searching products...")
     candidate_group_pairs = []
@@ -168,15 +169,31 @@ def determine_transitive_matches(candidate_pairs):
     return new_candidate_pairs
 
 
-def preprocess_input(row):
+def preprocess_input(row, stop_words, normalization):
     # To-Do: Improve tokenizer
     doc = ' '.join(
-        [str(value) for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])[:64]
+        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])
+    regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
+    for regex in regex_list:
+        doc = re.sub(regex, ' ', doc)
+
+    for stop_word in stop_words:
+        doc = doc.replace(stop_word, ' ')
+
+    for not_normalized_value in normalization:
+        if not_normalized_value in doc:
+            doc = doc.replace(not_normalized_value, normalization[not_normalized_value])
+
+    doc = re.sub('\s\s+', ' ', doc)
+    doc = re.sub('\s*$', '', doc)
+    doc = re.sub('^\s*', '', doc)
+    doc = doc[:64]
+
     return doc
 
 
 def generate_tokenized_input(preprocessed):
-    tokenized = preprocessed.lower().split(' ')
+    tokenized = preprocessed.split(' ')
     return tokenized
 
 
@@ -208,8 +225,13 @@ if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    X1_candidate_pairs = block_with_bm25("X1.csv", "title")
-    X2_candidate_pairs = block_with_bm25("X2.csv", "name")
+    stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+    normalization_X1 = {}
+    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1, normalization_X1)
+    stop_words_x2 = []
+    normalization_X2 = {}
+    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2, normalization_X2)
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
