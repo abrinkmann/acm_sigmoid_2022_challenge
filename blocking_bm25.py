@@ -1,5 +1,6 @@
 import itertools
 import logging
+import os
 import re
 import time
 
@@ -27,18 +28,19 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     logger.info("Indexing products...")
     X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words, normalization), axis=1)
     X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
+    # Introduce multiprocessing!
     X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
     #print(X_grouped.columns)
     #print(X_grouped['ids'].head())
     #print(len(X_grouped))
 
-    # Introduce multiprocessing!
     X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
     k = 2
 
     logger.info("Searching products...")
     candidate_group_pairs = []
-    worker = cpu_count()
+    worker = os.environ['WORKER']
+    logger.info('Number of initialized workers {}'.format(worker))
     pool = Pool(worker)
     results = []
 
