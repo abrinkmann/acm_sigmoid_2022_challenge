@@ -116,10 +116,13 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
 
 
 def search_bm25(value_range, X_grouped, k):
+    logger = logging.getLogger()
+    logger.info('Index Tokens')
     bm25 = BM25Okapi(X_grouped['tokenized'].values)
     candidate_group_pairs = []
 
-    for index in range(value_range[0], value_range[1]):
+    logger.info('Start search')
+    for index in tqdm(range(value_range[0], value_range[1])):
         if index < X_grouped.shape[0]:
             doc_scores = bm25.get_scores(X_grouped['tokenized'][index])
             for top_id in np.argsort(doc_scores)[::-1][:k]:
