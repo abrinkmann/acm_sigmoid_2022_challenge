@@ -50,7 +50,7 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     while start < X_grouped.shape[0]:
         value_range = (start, start+multiprocessing_step_size)
         results.append(
-            pool.apply_async(search_bm25, (value_range, X_grouped, k,)))
+            pool.apply_async(search_bm25, (value_range, X_grouped['tokenized'].copy(), k,)))
 
         start += multiprocessing_step_size
 
@@ -72,29 +72,14 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     logger.info('Create group candidates')
     pool = Pool(worker)
     candidate_pairs_real_ids = []
-    group_candidate_results = []
+    jaccard_similarities = []
     # Add candidates from grouping
     for i in tqdm(range(X_grouped.shape[0])):
         if len(X_grouped['ids'][i]) > 1:
-            group_candidate_results.append(pool.apply_async(determine_real_candidate_pairs, (X_grouped['ids'][i],)))
-
-    logger.info('Collect create group candidate results!')
-    jaccard_similarities = []
-    candidate_pairs_real_ids = []
-    while len(group_candidate_results) > 0:
-        collected_results = []
-        for result in group_candidate_results:
-            if result.ready():
-                new_candidate_pairs_real_ids = result.get()
-                candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-                jaccard_similarities.extend([1.0] * len(new_candidate_pairs_real_ids))
-                collected_results.append(result)
-
-        group_candidate_results = [result for result in group_candidate_results if result not in collected_results]
-
-    pool.close()
-    pool.join()
-
+            ids = list(sorted(X_grouped['ids'][i]))
+            for j in range(len(ids)):
+                for k in range(j + 1, len(ids)):
+                    candidate_pairs_real_ids.append((ids[j], ids[k]))
 
     candidate_group_pairs = list(set(candidate_group_pairs))
     #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
@@ -142,26 +127,16 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #return candidate_pairs_real_ids
 
 
-def determine_real_candidate_pairs(ids):
-    ids = list(sorted(ids))
-    candidate_pairs_real_ids = []
-    if len(ids) > 1:
-        for j in range(len(ids)):
-            for k in range(j + 1, len(ids)):
-                candidate_pairs_real_ids.append((ids[j], ids[k]))
-    return candidate_pairs_real_ids
-
-
-def search_bm25(value_range, X_grouped, k):
+def search_bm25(value_range, X_grouped_tokens, k):
     logger = logging.getLogger()
     logger.info('Index Tokens')
-    bm25 = BM25Okapi(X_grouped['tokenized'].values)
+    bm25 = BM25Okapi(X_grouped_tokens.values)
     candidate_group_pairs = []
 
     logger.info('Start search')
     for index in tqdm(range(value_range[0], value_range[1])):
-        if index < X_grouped.shape[0]:
-            doc_scores = bm25.get_scores(X_grouped['tokenized'][index])
+        if index < len(X_grouped_tokens):
+            doc_scores = bm25.get_scores(X_grouped_tokens[index])
             for top_id in np.argsort(doc_scores)[::-1][:k]:
                 if index != top_id:
                     normalized_score = doc_scores[top_id] / np.amax(doc_scores)
@@ -214,7 +189,8 @@ def determine_transitive_matches(candidate_pairs):
 def preprocess_input(row, stop_words, normalization):
     # To-Do: Improve tokenizer
     doc = ' '.join(
-        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])
+        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))])
+         #and key != 'id'])
     regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
     for regex in regex_list:
         doc = re.sub(regex, ' ', doc)
