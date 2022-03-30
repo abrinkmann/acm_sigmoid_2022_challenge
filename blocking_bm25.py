@@ -1,3 +1,4 @@
+import gc
 import itertools
 import logging
 import os
@@ -244,12 +245,13 @@ if __name__ == '__main__':
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1)[:expected_cand_size_X1]
+    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
+        gc.collect()
 
     stop_words_x2 = []
-    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2)[:expected_cand_size_X2]
+    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
