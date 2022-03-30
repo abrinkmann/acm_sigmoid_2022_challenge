@@ -89,7 +89,7 @@ def search_bm25(bm25, X_grouped_tokenized, index, k):
     for top_id in np.argsort(doc_scores)[::-1][:k]:
         if index != top_id:
             normalized_score = doc_scores[top_id] / np.amax(doc_scores)
-            if normalized_score < 0.5:
+            if normalized_score < 0.33:
                 break
 
             if index < top_id:
