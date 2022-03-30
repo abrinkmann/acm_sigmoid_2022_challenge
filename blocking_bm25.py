@@ -13,7 +13,7 @@ import pandas as pd
 
 
 
-def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with your logic.
+def block_with_bm25(path_to_X, attr, stop_words):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -26,8 +26,8 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     X = pd.read_csv(path_to_X)
 
     logger.info("Preprocessing products...")
-    X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words, normalization), axis=1)
-    X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
+    X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words), axis=1)
+    #X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
     # Introduce multiprocessing!
     X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
     #print(X_grouped.columns)
@@ -70,7 +70,6 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
 
     # Prepare pairs deduced from groups while waiting for search results
     logger.info('Create group candidates')
-    pool = Pool(worker)
     candidate_pairs_real_ids = []
     jaccard_similarities = []
     # Add candidates from grouping
@@ -81,7 +80,7 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
                 for k in range(j + 1, len(ids)):
                     candidate_pairs_real_ids.append((ids[j], ids[k]))
 
-    candidate_group_pairs = list(set(candidate_group_pairs))
+
     #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
     #candidate_pairs = determine_transitive_matches(list(candidate_pairs))
 
@@ -94,6 +93,7 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #pool = Pool(worker)
     #results = []
     logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
+    candidate_group_pairs = list(set(candidate_group_pairs))
     for pair in tqdm(candidate_group_pairs):
         id1, id2 = pair
 
@@ -127,16 +127,16 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #return candidate_pairs_real_ids
 
 
-def search_bm25(value_range, X_grouped_tokens, k):
+def search_bm25(value_range, X_grouped_tokenized, k):
     logger = logging.getLogger()
     logger.info('Index Tokens')
-    bm25 = BM25Okapi(X_grouped_tokens.values)
+    bm25 = BM25Okapi(X_grouped_tokenized.values)
     candidate_group_pairs = []
 
     logger.info('Start search')
     for index in tqdm(range(value_range[0], value_range[1])):
-        if index < len(X_grouped_tokens):
-            doc_scores = bm25.get_scores(X_grouped_tokens[index])
+        if index < len(X_grouped_tokenized):
+            doc_scores = bm25.get_scores(X_grouped_tokenized[index])
             for top_id in np.argsort(doc_scores)[::-1][:k]:
                 if index != top_id:
                     normalized_score = doc_scores[top_id] / np.amax(doc_scores)
@@ -186,21 +186,17 @@ def determine_transitive_matches(candidate_pairs):
     return new_candidate_pairs
 
 
-def preprocess_input(row, stop_words, normalization):
+def preprocess_input(row, stop_words):
     # To-Do: Improve tokenizer
     doc = ' '.join(
-        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))])
-         #and key != 'id'])
+        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))
+         and key != 'id'])
     regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
     for regex in regex_list:
         doc = re.sub(regex, ' ', doc)
 
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
-
-    for not_normalized_value in normalization:
-        if not_normalized_value in doc:
-            doc = doc.replace(not_normalized_value, normalization[not_normalized_value])
 
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
@@ -248,12 +244,14 @@ if __name__ == '__main__':
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    normalization_X1 = {}
-    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1, normalization_X1)[:expected_cand_size_X1]
+    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1)[:expected_cand_size_X1]
+    if len(X1_candidate_pairs) > expected_cand_size_X1:
+        X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     stop_words_x2 = []
-    normalization_X2 = {}
-    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2, normalization_X2)[:expected_cand_size_X2]
+    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2)[:expected_cand_size_X2]
+    if len(X2_candidate_pairs) > expected_cand_size_X2:
+        X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
