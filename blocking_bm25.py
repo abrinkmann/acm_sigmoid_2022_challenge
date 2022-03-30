@@ -25,7 +25,7 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     logger.info("Load dataset...")
     X = pd.read_csv(path_to_X)
 
-    logger.info("Indexing products...")
+    logger.info("Preprocessing products...")
     X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words, normalization), axis=1)
     X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
     # Introduce multiprocessing!
@@ -33,13 +33,13 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #print(X_grouped.columns)
     #print(X_grouped['ids'].head())
     #print(len(X_grouped))
-
+    logger.info("Tokenize products...")
     X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
     k = 2
 
     logger.info("Searching products...")
     candidate_group_pairs = []
-    worker = os.environ['WORKER']
+    worker = int(os.environ['WORKER'])
     logger.info('Number of initialized workers {}'.format(worker))
     pool = Pool(worker)
     results = []
