@@ -76,8 +76,8 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
             candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
 
     # Determine transitive groups
-    if len(candidate_pairs_real_ids) < expected_cand_size:
-        candidate_pairs_real_ids = determine_transitive_matches(candidate_pairs_real_ids)
+    #if len(candidate_pairs_real_ids) < expected_cand_size:
+    #    candidate_pairs_real_ids = determine_transitive_matches(candidate_pairs_real_ids)
 
     return candidate_pairs_real_ids
 
