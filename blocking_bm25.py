@@ -172,7 +172,8 @@ def determine_transitive_matches(candidate_pairs):
 def preprocess_input(row, stop_words, normalization):
     # To-Do: Improve tokenizer
     doc = ' '.join(
-        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])
+        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) ])
+         #and key != 'id'])
     regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
     for regex in regex_list:
         doc = re.sub(regex, ' ', doc)
@@ -228,10 +229,10 @@ if __name__ == '__main__':
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
     normalization_X1 = {}
-    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1, normalization_X1)
+    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1, normalization_X1)
     stop_words_x2 = []
     normalization_X2 = {}
-    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2, normalization_X2)
+    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2, normalization_X2)
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
