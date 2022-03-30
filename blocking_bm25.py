@@ -243,13 +243,17 @@ if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
+    expected_cand_size_X1 = 1000000
+    expected_cand_size_X2 = 2000000
+
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
     normalization_X1 = {}
-    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1, normalization_X1)
+    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1, normalization_X1)[:expected_cand_size_X1]
+
     stop_words_x2 = []
     normalization_X2 = {}
-    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2, normalization_X2)
+    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2, normalization_X2)[:expected_cand_size_X2]
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
