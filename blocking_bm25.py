@@ -31,48 +31,10 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
     #X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
     # Introduce multiprocessing!
     X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
-    #print(X_grouped.columns)
-    #print(X_grouped['ids'].head())
-    #print(len(X_grouped))
-    logger.info("Tokenize products...")
-    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
-    k = 2
-
-    logger.info("Searching products...")
-    candidate_group_pairs = []
-    worker = cpu_count()
-    logger.info('Number of initialized workers {}'.format(worker))
-    pool = Pool(worker)
-    results = []
-
-    multiprocessing_step_size = int((X_grouped.shape[0] / worker)) + 1
-    start = 0
-    logger.info('Start search!')
-    while start < X_grouped.shape[0]:
-        value_range = (start, start+multiprocessing_step_size)
-        results.append(
-            pool.apply_async(search_bm25, (value_range, X_grouped['tokenized'].copy(), k,)))
-
-        start += multiprocessing_step_size
-
-    logger.info('Collect search results!')
-    while len(results) > 0:
-        collected_results = []
-        for result in results:
-            if result.ready():
-                candidate_group_pair = result.get()
-                candidate_group_pairs.extend(candidate_group_pair)
-                collected_results.append(result)
-
-        results = [result for result in results if result not in collected_results]
-
-    pool.close()
-    pool.join()
 
     # Prepare pairs deduced from groups while waiting for search results
     logger.info('Create group candidates')
     candidate_pairs_real_ids = []
-    jaccard_similarities = []
     # Add candidates from grouping
     for i in tqdm(range(X_grouped.shape[0])):
         if len(X_grouped['ids'][i]) > 1:
@@ -83,32 +45,23 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
             if len(candidate_pairs_real_ids) > expected_cand_size:
                 break
 
+    logger.info("Tokenize products...")
+    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
+    k = 2
 
-    #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
-    #candidate_pairs = determine_transitive_matches(list(candidate_pairs))
+    logger.info('Start search!')
+    bm25 = BM25Okapi(X_grouped['tokenized'].values)
+    for i in tqdm(range(X_grouped.shape[0])):
+        if len(candidate_pairs_real_ids) > expected_cand_size:
+            break
 
-    # sort candidate pairs by jaccard similarity.
-    # In case we have more than 1000000 pairs (or 2000000 pairs for the second dataset),
-    # sort the candidate pairs to put more similar pairs first,
-    # so that when we keep only the first 1000000 pairs we are keeping the most likely pairs
-    logger.info('Sort candidates by jaccard similarity!')
-    # Add candidates from BM25 retrieval
-    #pool = Pool(worker)
-    #results = []
-    logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-    candidate_group_pairs = list(set(candidate_group_pairs))
-    if len(candidate_pairs_real_ids) < expected_cand_size:
-        for pair in tqdm(candidate_group_pairs):
+        candidate_group_pairs = search_bm25(bm25, X_grouped['tokenized'], i, k)
+        for pair in candidate_group_pairs:
             id1, id2 = pair
 
             # Determine real ids
-
             real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
             real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
-
-            s1 = set(X_grouped['tokenized'][id1])
-            s2 = set(X_grouped['tokenized'][id2])
-            jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
 
             new_candidate_pairs_real_ids = []
             for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
@@ -119,42 +72,34 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
                 else:
                     continue
                 new_candidate_pairs_real_ids.append(candidate_pair)
-
             new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
             candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-            # Add jaccard similarity
-            jaccard_similarities.extend([jaccard_sim]*len(new_candidate_pairs_real_ids))
 
-    logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+    # Determine transitive groups
+    if len(candidate_pairs_real_ids) < expected_cand_size:
+        candidate_pairs_real_ids = determine_transitive_matches(candidate_pairs_real_ids)
+
     return candidate_pairs_real_ids
-    #return candidate_pairs_real_ids
 
 
-def search_bm25(value_range, X_grouped_tokenized, k):
-    logger = logging.getLogger()
-    logger.info('Index Tokens')
-    bm25 = BM25Okapi(X_grouped_tokenized.values)
+def search_bm25(bm25, X_grouped_tokenized, index, k):
     candidate_group_pairs = []
 
-    logger.info('Start search')
-    for index in tqdm(range(value_range[0], value_range[1])):
-        if index < len(X_grouped_tokenized):
-            doc_scores = bm25.get_scores(X_grouped_tokenized[index])
-            for top_id in np.argsort(doc_scores)[::-1][:k]:
-                if index != top_id:
-                    normalized_score = doc_scores[top_id] / np.amax(doc_scores)
-                    if normalized_score < 0.33:
-                        break
+    doc_scores = bm25.get_scores(X_grouped_tokenized[index])
+    for top_id in np.argsort(doc_scores)[::-1][:k]:
+        if index != top_id:
+            normalized_score = doc_scores[top_id] / np.amax(doc_scores)
+            if normalized_score < 0.5:
+                break
 
-                    if index < top_id:
-                        candidate_group_pair = (index, top_id)
-                    elif index > top_id:
-                        candidate_group_pair = (top_id, index)
-                    else:
-                        continue
+            if index < top_id:
+                candidate_group_pair = (index, top_id)
+            elif index > top_id:
+                candidate_group_pair = (top_id, index)
+            else:
+                continue
 
-                    candidate_group_pairs.append(candidate_group_pair)
+            candidate_group_pairs.append(candidate_group_pair)
     return candidate_group_pairs
 
 
@@ -248,13 +193,12 @@ if __name__ == '__main__':
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    X1_candidate_pairs = block_with_bm25("X1_extended.csv", "title", stop_words_x1, expected_cand_size_X1)
+    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1, expected_cand_size_X1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
-        gc.collect()
 
     stop_words_x2 = []
-    X2_candidate_pairs = block_with_bm25("X2_extended.csv", "name", stop_words_x2, expected_cand_size_X1)
+    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2, expected_cand_size_X1)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
