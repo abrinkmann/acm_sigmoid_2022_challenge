@@ -54,20 +54,6 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
 
         start += multiprocessing_step_size
 
-    # Prepare pairs deduced from groups while waiting for search results
-    logger.info('Create group candidates')
-    candidate_pairs_real_ids = []
-    # Add candidates from grouping
-    for i in tqdm(range(X_grouped.shape[0])):
-        ids = list(sorted(X_grouped['ids'][i]))
-        if len(ids) > 1:
-            for j in range(len(ids)):
-                for k in range(j + 1, len(ids)):
-                    candidate_pairs_real_ids.append((ids[j], ids[k]))
-
-    jaccard_similarities = [1.0] * len(candidate_pairs_real_ids)
-
-    # Collect search results
     logger.info('Collect search results!')
     while len(results) > 0:
         collected_results = []
@@ -79,8 +65,36 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
 
         results = [result for result in results if result not in collected_results]
 
-    #pool.join()
-    #pool.close()
+    pool.close()
+    pool.join()
+
+    # Prepare pairs deduced from groups while waiting for search results
+    logger.info('Create group candidates')
+    pool = Pool(worker)
+    candidate_pairs_real_ids = []
+    group_candidate_results = []
+    # Add candidates from grouping
+    for i in tqdm(range(X_grouped.shape[0])):
+        if len(X_grouped['ids'][i]) > 1:
+            group_candidate_results.append(pool.apply_async(determine_real_candidate_pairs, (X_grouped['ids'][i],)))
+
+    logger.info('Collect create group candidate results!')
+    jaccard_similarities = []
+    candidate_pairs_real_ids = []
+    while len(group_candidate_results) > 0:
+        collected_results = []
+        for result in group_candidate_results:
+            if result.ready():
+                new_candidate_pairs_real_ids = result.get()
+                candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+                jaccard_similarities.extend([1.0] * len(new_candidate_pairs_real_ids))
+                collected_results.append(result)
+
+        group_candidate_results = [result for result in group_candidate_results if result not in collected_results]
+
+    pool.close()
+    pool.join()
+
 
     candidate_group_pairs = list(set(candidate_group_pairs))
     #candidate_group_pairs = determine_transitive_matches(list(candidate_group_pairs))
@@ -95,37 +109,48 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #pool = Pool(worker)
     #results = []
     logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-    for pair in tqdm(candidate_group_pairs):
-        id1, id2 = pair
+    if len(candidate_pairs_real_ids) < 2000000:
+        for pair in tqdm(candidate_group_pairs):
+            id1, id2 = pair
 
-        # Determine real ids
+            # Determine real ids
 
-        real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
-        real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
+            real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
+            real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
 
-        s1 = set(X_grouped['tokenized'][id1])
-        s2 = set(X_grouped['tokenized'][id2])
-        jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
+            s1 = set(X_grouped['tokenized'][id1])
+            s2 = set(X_grouped['tokenized'][id2])
+            jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
 
-        new_candidate_pairs_real_ids = []
-        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-            if real_id1 < real_id2:
-                candidate_pair = (real_id1, real_id2)
-            elif real_id1 > real_id2:
-                candidate_pair = (real_id2, real_id1)
-            else:
-                continue
-            new_candidate_pairs_real_ids.append(candidate_pair)
+            new_candidate_pairs_real_ids = []
+            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+                if real_id1 < real_id2:
+                    candidate_pair = (real_id1, real_id2)
+                elif real_id1 > real_id2:
+                    candidate_pair = (real_id2, real_id1)
+                else:
+                    continue
+                new_candidate_pairs_real_ids.append(candidate_pair)
 
-        new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
-        candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-        # Add jaccard similarity
-        jaccard_similarities.extend([jaccard_sim]*len(new_candidate_pairs_real_ids))
+            new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
+            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+            # Add jaccard similarity
+            jaccard_similarities.extend([jaccard_sim]*len(new_candidate_pairs_real_ids))
 
-    logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+        logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
+        candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
     return candidate_pairs_real_ids
     #return candidate_pairs_real_ids
+
+
+def determine_real_candidate_pairs(ids):
+    ids = list(sorted(ids))
+    candidate_pairs_real_ids = []
+    if len(ids) > 1:
+        for j in range(len(ids)):
+            for k in range(j + 1, len(ids)):
+                candidate_pairs_real_ids.append((ids[j], ids[k]))
+    return candidate_pairs_real_ids
 
 
 def search_bm25(value_range, X_grouped, k):
@@ -190,8 +215,7 @@ def determine_transitive_matches(candidate_pairs):
 def preprocess_input(row, stop_words, normalization):
     # To-Do: Improve tokenizer
     doc = ' '.join(
-        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))])
-         #and key != 'id'])
+        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value)) and key != 'id'])
     regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
     for regex in regex_list:
         doc = re.sub(regex, ' ', doc)
