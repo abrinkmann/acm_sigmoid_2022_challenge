@@ -109,36 +109,35 @@ def block_with_bm25(path_to_X, attr, stop_words, normalization):  # replace with
     #pool = Pool(worker)
     #results = []
     logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-    if len(candidate_pairs_real_ids) < 2000000:
-        for pair in tqdm(candidate_group_pairs):
-            id1, id2 = pair
+    for pair in tqdm(candidate_group_pairs):
+        id1, id2 = pair
 
-            # Determine real ids
+        # Determine real ids
 
-            real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
-            real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
+        real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
+        real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
 
-            s1 = set(X_grouped['tokenized'][id1])
-            s2 = set(X_grouped['tokenized'][id2])
-            jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
+        s1 = set(X_grouped['tokenized'][id1])
+        s2 = set(X_grouped['tokenized'][id2])
+        jaccard_sim = len(s1.intersection(s2)) / max(len(s1), len(s2))
 
-            new_candidate_pairs_real_ids = []
-            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-                if real_id1 < real_id2:
-                    candidate_pair = (real_id1, real_id2)
-                elif real_id1 > real_id2:
-                    candidate_pair = (real_id2, real_id1)
-                else:
-                    continue
-                new_candidate_pairs_real_ids.append(candidate_pair)
+        new_candidate_pairs_real_ids = []
+        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+            if real_id1 < real_id2:
+                candidate_pair = (real_id1, real_id2)
+            elif real_id1 > real_id2:
+                candidate_pair = (real_id2, real_id1)
+            else:
+                continue
+            new_candidate_pairs_real_ids.append(candidate_pair)
 
-            new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
-            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-            # Add jaccard similarity
-            jaccard_similarities.extend([jaccard_sim]*len(new_candidate_pairs_real_ids))
+        new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
+        candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+        # Add jaccard similarity
+        jaccard_similarities.extend([jaccard_sim]*len(new_candidate_pairs_real_ids))
 
-        logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
-        candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+    logger.info('Number of candidate pairs: {}'.format(len(candidate_pairs_real_ids)))
+    candidate_pairs_real_ids = [x for _, x in sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
     return candidate_pairs_real_ids
     #return candidate_pairs_real_ids
 
