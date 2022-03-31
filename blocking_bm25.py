@@ -14,7 +14,7 @@ import pandas as pd
 
 
 
-def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace with your logic.
+def block_with_bm25(path_to_X, attr, expected_cand_size):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -27,7 +27,7 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
     X = pd.read_csv(path_to_X)
 
     logger.info("Preprocessing products...")
-    X['preprocessed'] = X.apply(lambda row: preprocess_input(row, stop_words), axis=1)
+    X = parallel_processing(X, preprocess_dataframe)
     #X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
     # Introduce multiprocessing!
     X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
@@ -46,7 +46,7 @@ def block_with_bm25(path_to_X, attr, stop_words, expected_cand_size):  # replace
                 break
 
     logger.info("Tokenize products...")
-    X_grouped['tokenized'] = X_grouped.apply(lambda row: generate_tokenized_input(row['preprocessed']), axis=1)
+    X_grouped = parallel_processing(X_grouped, tokenize_dataframe)
     k = 2
 
     logger.info('Start search!')
@@ -135,7 +135,24 @@ def determine_transitive_matches(candidate_pairs):
     return new_candidate_pairs
 
 
-def preprocess_input(row, stop_words):
+def parallel_processing(X, func):
+    worker = cpu_count()
+    pool = Pool(worker)
+    X_split = np.array_split(X, worker)
+    X_split = pool.map(func, tqdm(X_split))
+    pool.close()
+    pool.join()
+
+    return pd.concat(X_split)
+
+
+def preprocess_dataframe(X):
+    return X.apply(preprocess_input, axis=1)
+
+
+def preprocess_input(row):
+    stop_words = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
     # To-Do: Improve tokenizer
     doc = ' '.join(
         [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))
@@ -150,14 +167,18 @@ def preprocess_input(row, stop_words):
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
-    doc = doc[:64]
+    row['preprocessed'] = doc[:64]
 
-    return doc
+    return row
 
 
-def generate_tokenized_input(preprocessed):
-    tokenized = preprocessed.split(' ')
-    return tokenized
+def tokenize_dataframe(X):
+    return X.apply(generate_tokenized_input, axis=1)
+
+
+def generate_tokenized_input(row):
+    row['tokenized'] = row['preprocessed'].split(' ')
+    return row
 
 
 def save_output(X1_candidate_pairs,
@@ -193,14 +214,15 @@ if __name__ == '__main__':
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    X1_candidate_pairs = block_with_bm25("X1.csv", "title", stop_words_x1, expected_cand_size_X1)
+    X1_candidate_pairs = block_with_bm25("X1.csv", "title", expected_cand_size_X1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    stop_words_x2 = []
-    X2_candidate_pairs = block_with_bm25("X2.csv", "name", stop_words_x2, expected_cand_size_X1)
-    if len(X2_candidate_pairs) > expected_cand_size_X2:
-        X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
+    X2_candidate_pairs = []
+    # stop_words_x2 = []
+    # X2_candidate_pairs = block_with_bm25("X2.csv", "name", expected_cand_size_X1)
+    # if len(X2_candidate_pairs) > expected_cand_size_X2:
+    #     X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
