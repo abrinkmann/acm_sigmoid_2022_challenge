@@ -49,32 +49,25 @@ def block_with_bm25(path_to_X, attr, expected_cand_size):  # replace with your l
         X_grouped = parallel_processing(X_grouped, tokenize_dataframe)
         k = 2
 
+        pool = Pool(worker)
+
         logger.info('Start search!')
         bm25 = BM25Okapi(X_grouped['tokenized'].values)
         for i in tqdm(range(X_grouped.shape[0])):
             if len(candidate_pairs_real_ids) > expected_cand_size:
                 break
 
+            # Search candidates
             candidate_group_pairs = search_bm25(bm25, X_grouped['tokenized'], i, k)
-            for pair in candidate_group_pairs:
-                id1, id2 = pair
 
-                # Determine real ids
-                real_group_ids_1 = list(sorted(X_grouped['ids'][id1]))
-                real_group_ids_2 = list(sorted(X_grouped['ids'][id2]))
+            # Determine pairs
+            candidate_group_pair_ids = [(X_grouped['ids'][pair[0]], X_grouped['ids'][pair[1]])for pair in candidate_group_pairs]
+            new_candidate_pairs_real_ids = pool.map(determine_pairs_by_group_pairs, candidate_group_pair_ids)
+            new_candidate_pairs_real_ids = list(set(itertools.chain(*new_candidate_pairs_real_ids)))
+            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
 
-                new_candidate_pairs_real_ids = []
-                for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-                    if real_id1 < real_id2:
-                        candidate_pair = (real_id1, real_id2)
-                    elif real_id1 > real_id2:
-                        candidate_pair = (real_id2, real_id1)
-                    else:
-                        continue
-                    new_candidate_pairs_real_ids.append(candidate_pair)
-                new_candidate_pairs_real_ids = list(set(new_candidate_pairs_real_ids))
-                candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-
+        pool.close()
+        pool.join()
         # Determine transitive groups
         #if len(candidate_pairs_real_ids) < expected_cand_size:
         #    candidate_pairs_real_ids = determine_transitive_matches(candidate_pairs_real_ids)
@@ -190,6 +183,25 @@ def determine_pairs_by_group_ids(ids):
             candidate_pairs_real_ids.append((ids[j], ids[k]))
 
     return candidate_pairs_real_ids
+
+
+def determine_pairs_by_group_pairs(id_pair):
+    # Determine real ids
+    ids1, ids2 = id_pair
+    real_group_ids_1 = list(sorted(ids1))
+    real_group_ids_2 = list(sorted(ids2))
+
+    new_candidate_pairs_real_ids = []
+    for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+        if real_id1 < real_id2:
+            candidate_pair = (real_id1, real_id2)
+        elif real_id1 > real_id2:
+            candidate_pair = (real_id2, real_id1)
+        else:
+            continue
+        new_candidate_pairs_real_ids.append(candidate_pair)
+
+    return list(set(new_candidate_pairs_real_ids))
 
 def save_output(X1_candidate_pairs,
                 X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
