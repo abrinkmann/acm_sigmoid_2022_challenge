@@ -14,7 +14,7 @@ import pandas as pd
 
 
 
-def block_with_bm25(path_to_X, attr, expected_cand_size):  # replace with your logic.
+def block_with_bm25(X, attr, expected_cand_size):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -22,9 +22,6 @@ def block_with_bm25(path_to_X, attr, expected_cand_size):  # replace with your l
     '''
 
     logger = logging.getLogger()
-
-    logger.info("Load dataset...")
-    X = pd.read_csv(path_to_X)
 
     logger.info("Preprocessing products...")
     X = parallel_processing(X, preprocess_dataframe)
@@ -50,6 +47,7 @@ def block_with_bm25(path_to_X, attr, expected_cand_size):  # replace with your l
         k = 2
 
         pool = Pool(worker)
+        search_results = []
 
         logger.info('Start search!')
         bm25 = BM25Okapi(X_grouped['tokenized'].values)
@@ -87,10 +85,8 @@ def search_bm25(bm25, X_grouped_tokenized, index, k):
 
             if index < top_id:
                 candidate_group_pair = (index, top_id)
-            elif index > top_id:
-                candidate_group_pair = (top_id, index)
             else:
-                continue
+                candidate_group_pair = (top_id, index)
 
             candidate_group_pairs.append(candidate_group_pair)
     return candidate_group_pairs
@@ -234,17 +230,21 @@ if __name__ == '__main__':
     expected_cand_size_X1 = 1000000
     expected_cand_size_X2 = 2000000
 
+    X_1 = pd.read_csv("X1.csv")
+    X_2 = pd.read_csv("X2.csv")
+
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    X1_candidate_pairs = block_with_bm25("X1.csv", "title", expected_cand_size_X1)
+
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    X2_candidate_pairs = []
-    # stop_words_x2 = []
-    # X2_candidate_pairs = block_with_bm25("X2.csv", "name", expected_cand_size_X1)
-    # if len(X2_candidate_pairs) > expected_cand_size_X2:
-    #     X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
+    #X2_candidate_pairs = []
+    stop_words_x2 = []
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1)
+    if len(X2_candidate_pairs) > expected_cand_size_X2:
+        X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
