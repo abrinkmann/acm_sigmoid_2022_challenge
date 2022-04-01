@@ -72,7 +72,6 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         pool.join()
 
         candidate_group_pairs = list(set(itertools.chain(*candidate_group_pairs)))
-        logger.info('Derive pairs from groups')
         if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
             candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
 
@@ -99,7 +98,7 @@ def search_bm25(tokenized_corpus, start, finish, k):
 
     # Search Corpus
     candidate_group_pairs = []
-    for index in tqdm(range(start, finish)):
+    for index in range(start, finish):
         if index < len(tokenized_corpus):
             query = tokenized_corpus[index]
             doc_scores = bm25.get_scores(query)
@@ -118,6 +117,7 @@ def search_bm25(tokenized_corpus, start, finish, k):
 
     #print('Result length: {}'.format(len(candidate_group_pairs)))
     return candidate_group_pairs
+
 
 
 def determine_transitive_matches(candidate_pairs):
