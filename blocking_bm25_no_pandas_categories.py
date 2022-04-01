@@ -34,13 +34,13 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace wi
         doc = ' '.join(
             [str(X[attr][i]) for attr in attrs if
              not (type(X[attr][i]) is float and np.isnan(X[attr][i]))]).lower()
-        doc_brand = 'Null'
+        #doc_brand = 'Null'
         for brand in brands:
             if brand in doc:
-                doc_brand = brand
+                pattern_1 = preprocess_input(doc, stop_words, regex_list)
+                docbrand2pattern2id[brand][pattern_1].append(X['id'][i])
                 break
-        pattern_1 = preprocess_input(doc, stop_words, regex_list)
-        docbrand2pattern2id[doc_brand][pattern_1].append(X['id'][i])
+
 
     # Prepare pairs deduced from groups while waiting for search results
     logger.info('Create group candidates')
@@ -58,6 +58,7 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace wi
     worker = cpu_count()
     pool = Pool(worker)
 
+    logger.info('Start search')
     new_candidate_pairs_real_ids = pool.starmap(search_per_doc_brand, zip(docbrand2pattern2id.values(),
                                                                           itertools.repeat(k_hits)))
 

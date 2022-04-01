@@ -75,6 +75,7 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         pool = Pool(worker)
         # Introduce batches(?)
         embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
+        # To-Do: Make sure that the embeddings are normalized
         faiss_index = faiss.IndexFlatIP(256)
         for i in range(len(embedded_corpus)):
             faiss_index.add(embedded_corpus[i])
