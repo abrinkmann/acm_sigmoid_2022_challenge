@@ -24,9 +24,9 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
     '''
 
     logger = logging.getLogger()
-    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    regex_list = ['[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
+    stop_words = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'china']
+    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
 
     logger.info("Preprocessing products...")
     pattern2id_1 = defaultdict(list)

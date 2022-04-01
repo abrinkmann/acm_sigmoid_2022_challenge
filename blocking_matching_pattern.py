@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+from collections import defaultdict
 from multiprocessing import Queue, Value, Process
 
 import numpy as np
@@ -15,7 +16,7 @@ import pandas as pd
 
 
 
-def block_with_bm25(X, attr, expected_cand_size, path_to_X):  # replace with your logic.
+def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -23,78 +24,100 @@ def block_with_bm25(X, attr, expected_cand_size, path_to_X):  # replace with you
     '''
 
     logger = logging.getLogger()
+    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
 
     logger.info("Preprocessing products...")
-    X = parallel_processing(X, preprocess_dataframe)
-    X.to_csv(path_to_X.replace('.csv', '_preprocessed.csv'))
-    # Introduce multiprocessing!
-    X_grouped = X.groupby(by=['preprocessed'])['id'].apply(list).reset_index(name='ids')
-    #X_grouped = parallel_processing(X_grouped,count_ids_dataframe)
-    #X_grouped = X_grouped.sort_values(by=['len_ids'])
+    pattern2id_1 = defaultdict(list)
+    for i in tqdm(range(X.shape[0])):
+        doc = ' '.join(
+            [str(X[attr][i]) for attr in attrs if
+             not (type(X[attr][i]) is float and np.isnan(X[attr][i]))]).lower()
+        pattern_1 = preprocess_input(doc, stop_words, regex_list)
+        pattern2id_1[pattern_1].append(X['id'][i])
+
+    goup_ids = [i for i in range(len(pattern2id_1))]
+    group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
 
     # Prepare pairs deduced from groups while waiting for search results
     logger.info('Create group candidates')
     # Add candidates from grouping
-    worker = cpu_count()
-    pool = Pool(worker)
-    candidate_pairs_real_ids = pool.map(determine_pairs_by_group_ids, tqdm(X_grouped['ids'].values))
-    pool.close()
-    pool.join()
+    candidate_pairs_real_ids = []
 
-    candidate_pairs_real_ids = list(set(itertools.chain(*candidate_pairs_real_ids)))
+    for ids in tqdm(group2id_1.values()):
+        ids = list(sorted(ids))
+        for j in range(len(ids)):
+            for k in range(j + 1, len(ids)):
+                candidate_pairs_real_ids.append((ids[j], ids[k]))
 
-    if len(candidate_pairs_real_ids) < expected_cand_size:
-        logger.info("Tokenize products...")
-        X_grouped = parallel_processing(X_grouped, tokenize_dataframe)
-        k = 2
+    candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
-        #processes = []
-        #for i in range(worker/2):
-        logger.info('Index tokens!')
-        bm25 = BM25Okapi(X_grouped['tokenized'].values)
-        pool = Pool(worker)
-        logger.info('Start search')
-        candidate_group_pairs = pool.starmap(search_bm25, zip(itertools.repeat(bm25), X_grouped['tokenized'].values,
-                                                              X_grouped.index, itertools.repeat(k)))
-
-        candidate_group_pairs = list(set(itertools.chain(*candidate_group_pairs)))
-        logger.info('Derive pairs from groups')
-        if len(candidate_group_pairs) > expected_cand_size:
-            candidate_group_pairs = candidate_group_pairs[:expected_cand_size]
-
-        candidate_group_pair_ids = [(X_grouped['ids'][pair[0]], X_grouped['ids'][pair[1]]) for pair in candidate_group_pairs]
-        new_candidate_pairs_real_ids = pool.map(determine_pairs_by_group_pairs, tqdm(candidate_group_pair_ids))
-        candidate_pairs_real_ids.extend(list(set(itertools.chain(*new_candidate_pairs_real_ids))))
-
-        pool.close()
-        pool.join()
-        #p.join()
-        #p.close()
-        # Determine transitive groups
-        #if len(candidate_pairs_real_ids) < expected_cand_size:
-        #    candidate_pairs_real_ids = determine_transitive_matches(candidate_pairs_real_ids)
+    # if len(candidate_pairs_real_ids) < expected_cand_size:
+    #     logger.info("Tokenize products...")
+    #
+    #     worker = cpu_count()
+    #     pool = Pool(worker)
+    #     tokenized_corpus = pool.map(tokenize, pattern2id_1.keys())
+    #
+    #     logger.info('Start search')
+    #     start = 0
+    #     step = int(len(group2id_1) / worker) + 1
+    #     value_range_start = range(start, len(group2id_1), step)
+    #     value_range_finish = range(step, len(group2id_1) + step, step)
+    #
+    #     candidate_group_pairs = pool.starmap(search_bm25, zip(itertools.repeat(tokenized_corpus), value_range_start,
+    #                                                           value_range_finish, itertools.repeat(k_hits)))
+    #     pool.close()
+    #     pool.join()
+    #
+    #     candidate_group_pairs = list(set(itertools.chain(*candidate_group_pairs)))
+    #     if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
+    #         candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
+    #
+    #     logger.info('GroupIds to real ids')
+    #     for pair in tqdm(candidate_group_pairs):
+    #         real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
+    #         real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
+    #
+    #         for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+    #             if real_id1 < real_id2:
+    #                 candidate_pair = (real_id1, real_id2)
+    #             elif real_id1 > real_id2:
+    #                 candidate_pair = (real_id2, real_id1)
+    #             else:
+    #                 continue
+    #             candidate_pairs_real_ids.append(candidate_pair)
 
     return candidate_pairs_real_ids
 
 
-def search_bm25(bm25, query, index, k):
+def search_bm25(tokenized_corpus, start, finish, k):
+    # Index Corpus
+    bm25 = BM25Okapi(tokenized_corpus)
 
+    # Search Corpus
     candidate_group_pairs = []
-    doc_scores = bm25.get_scores(query)
-    for top_id in np.argsort(doc_scores)[::-1][:k]:
-        if index != top_id:
-            normalized_score = doc_scores[top_id] / np.amax(doc_scores)
-            if normalized_score < 0.33:
-                break
+    for index in range(start, finish):
+        if index < len(tokenized_corpus):
+            query = tokenized_corpus[index]
+            doc_scores = bm25.get_scores(query)
+            for top_id in np.argsort(doc_scores)[::-1][:k]:
+                if index != top_id:
+                    normalized_score = doc_scores[top_id] / np.amax(doc_scores)
+                    if normalized_score < 0.33:
+                        break
 
-            if index < top_id:
-                candidate_group_pair = (index, top_id)
-            else:
-                candidate_group_pair = (top_id, index)
+                    if index < top_id:
+                        candidate_group_pair = (index, top_id)
+                    else:
+                        candidate_group_pair = (top_id, index)
 
-            candidate_group_pairs.append(candidate_group_pair)
+                    candidate_group_pairs.append(candidate_group_pair)
 
+    #print('Result length: {}'.format(len(candidate_group_pairs)))
     return candidate_group_pairs
+
 
 
 def determine_transitive_matches(candidate_pairs):
@@ -153,26 +176,18 @@ def preprocess_dataframe(X):
     return X.apply(preprocess_input, axis=1)
 
 
-def preprocess_input(row):
-    stop_words = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'shop']
+def preprocess_input(doc, stop_words, regex_list):
     # To-Do: Improve tokenizer
-    doc = ' '.join(
-        [str(value).lower() for key, value in row.to_dict().items() if not (type(value) is float and np.isnan(value))
-         and key != 'id'])
-    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '^"', '-$', ':\s', '\(', '\)', ',', '\\n']
-    for regex in regex_list:
-        doc = re.sub(regex, ' ', doc)
-
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
+
+    for regex in regex_list:
+        doc = re.sub(regex, ' ', doc)
 
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
-    row['preprocessed'] = doc[:64]
-
-    return row
+    return doc[:64]
 
 
 def tokenize_dataframe(X):
@@ -183,6 +198,8 @@ def generate_tokenized_input(row):
     row['tokenized'] = row['preprocessed'].split(' ')
     return row
 
+def tokenize(value):
+    return value.split(' ')
 
 def determine_pairs_by_group_ids(ids):
     candidate_pairs_real_ids = []
@@ -250,13 +267,15 @@ if __name__ == '__main__':
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
-    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1,"X1.csv")
+    k_x_1 = 2
+    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, "X2.csv")
+    k_x_2 = 2
+    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
