@@ -10,7 +10,8 @@ from multiprocessing import Queue, Value, Process
 import numpy as np
 from multiprocess.pool import Pool
 from psutil import cpu_count
-from rank_bm25 import BM25Okapi
+from bm25 import BM25
+#from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
 
@@ -34,12 +35,14 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace wi
         doc = ' '.join(
             [str(X[attr][i]) for attr in attrs if
              not (type(X[attr][i]) is float and np.isnan(X[attr][i]))]).lower()
-        #doc_brand = 'Null'
+        doc_brand = 'Null'
         for brand in brands:
             if brand in doc:
-                pattern_1 = preprocess_input(doc, stop_words, regex_list)
-                docbrand2pattern2id[brand][pattern_1].append(X['id'][i])
+                doc_brand = brand
                 break
+
+        pattern_1 = preprocess_input(doc, stop_words, regex_list)
+        docbrand2pattern2id[doc_brand][pattern_1].append(X['id'][i])
 
 
     # Prepare pairs deduced from groups while waiting for search results
@@ -64,6 +67,7 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace wi
 
     new_candidate_pairs_real_ids = list(set(itertools.chain(*new_candidate_pairs_real_ids)))
     candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+    logger.info('Finished search')
 
     pool.close()
     pool.join()
@@ -75,14 +79,22 @@ def tokenize(value):
     return value.split(' ')
 
 
+def tokenize_tfidf_vectorizer(value):
+    token_pattern = re.compile(r"(?u)\b\w\w+\b")
+    tokens = token_pattern.findall(value)
+
+    return tokens
+
+
 def search_per_doc_brand(doc_brand, k_hits):
     new_candidate_pairs_real_ids = []
     goup_ids = [i for i in range(len(doc_brand.values()))]
     group2id_1 = dict(zip(goup_ids, doc_brand.values()))
 
-    tokenized_corpus = [tokenize(value) for value in doc_brand.keys()]
+    #tokenized_corpus = [tokenize(value) for value in doc_brand.keys()]
+    corpus = list(doc_brand.keys())
 
-    candidate_group_pairs = search_bm25(tokenized_corpus, k_hits)
+    candidate_group_pairs = search_bm25(corpus, k_hits)
 
     candidate_group_pairs = list(set(candidate_group_pairs))
 
@@ -104,18 +116,21 @@ def search_per_doc_brand(doc_brand, k_hits):
 
 def search_bm25(tokenized_corpus, k):
     # Index Corpus
-    bm25 = BM25Okapi(tokenized_corpus)
+    bm25 = BM25(min_df=2, max_df=15)
+    bm25.fit(tokenized_corpus)
 
     # Search Corpus
     candidate_group_pairs = []
     for index in range(len(tokenized_corpus)):
         if index < len(tokenized_corpus):
             query = tokenized_corpus[index]
-            doc_scores = bm25.get_scores(query)
+            doc_scores = bm25.transform(query)
+            # doc_scores = bm25.get_scores(query)
+            #hits = np.argsort(doc_scores)[::-1][:k]
             for top_id in np.argsort(doc_scores)[::-1][:k]:
-                if index != top_id:
+                if index != top_id and np.amax(doc_scores) > 0:
                     normalized_score = doc_scores[top_id] / np.amax(doc_scores)
-                    if normalized_score < 0.33:
+                    if normalized_score < 0.2:
                         break
 
                     if index < top_id:
@@ -190,7 +205,7 @@ if __name__ == '__main__':
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    k_x_2 = 2
+    k_x_2 = 3
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
     X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
