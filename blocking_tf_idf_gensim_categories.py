@@ -7,16 +7,13 @@ import time
 from collections import defaultdict
 
 import gensim
-import gensim.downloader as api
-from multiprocessing import Queue, Value, Process
+from multiprocessing import Pool
 
 import numpy as np
 from gensim import corpora
 from gensim.corpora import Dictionary
-from multiprocess.pool import Pool
 from psutil import cpu_count
 from bm25 import BM25
-#from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
 from gensim.models import TfidfModel
@@ -261,7 +258,7 @@ if __name__ == '__main__':
     k_x_1 = 2
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp', 'hewlett-packard' 'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
+    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1, brands_x_1, parallel=True)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -269,7 +266,7 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 3
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2, parallel=False)
+    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2, parallel=True)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
