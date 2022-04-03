@@ -23,7 +23,7 @@ from gensim.models import TfidfModel
 
 
 
-def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace with your logic.
+def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands, parallel):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -68,8 +68,14 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands):  # replace wi
     pool = Pool(worker)
 
     logger.info('Start search')
-    new_candidate_pairs_real_ids = pool.starmap(search_tfidf_gensim, zip(docbrand2pattern2id.values(),
-                                                                          itertools.repeat(k_hits)))
+    if parallel:
+        new_candidate_pairs_real_ids = pool.starmap(search_tfidf_gensim, zip(docbrand2pattern2id.values(),
+                                                                      itertools.repeat(k_hits)))
+    else:
+        new_candidate_pairs_real_ids = []
+        for doc_brand in docbrand2pattern2id.values():
+            new_candidate_pairs_real_ids.append(search_tfidf_gensim(doc_brand, k_hits))
+
 
     #for doc_brand in docbrand2pattern2id.values():
     #    search_tfidf_gensim(doc_brand, k_hits)
@@ -255,7 +261,7 @@ if __name__ == '__main__':
     k_x_1 = 2
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp', 'hewlett-packard' 'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1, brands_x_1)
+    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -263,7 +269,7 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 3
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2)
+    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2, parallel=False)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
