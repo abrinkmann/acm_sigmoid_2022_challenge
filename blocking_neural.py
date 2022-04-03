@@ -1,9 +1,7 @@
-import gc
+
 import itertools
 import logging
-import os
 import re
-import time
 from collections import defaultdict
 
 import faiss
@@ -12,7 +10,6 @@ import torch
 import numpy as np
 from multiprocess.pool import Pool
 from psutil import cpu_count
-from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
