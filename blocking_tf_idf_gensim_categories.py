@@ -11,9 +11,7 @@ from multiprocessing import Pool
 
 import numpy as np
 from gensim import corpora
-from gensim.corpora import Dictionary
 from psutil import cpu_count
-from bm25 import BM25
 from tqdm import tqdm
 import pandas as pd
 from gensim.models import TfidfModel
