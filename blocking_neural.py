@@ -8,6 +8,7 @@ import faiss
 import torch
 
 import numpy as np
+from multiprocess.pool import Pool
 from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
@@ -69,22 +70,22 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
         from datasets import Dataset
         logger.info("Encode & Embed entities...")
-        embeddings = []
-        for example in tqdm(list(pattern2id_1.keys())):
-            embeddings.append(encode_and_embed(example))
+        #embeddings = []
+        #for example in tqdm(list(pattern2id_1.keys())):
+        #    embeddings.append(encode_and_embed(example))
         # ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
         # ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode_and_embed(examples['corpus'])}, batched=True,
         #                             batch_size=16, num_proc=cpu_count())
         # ds_with_embeddings.add_faiss_index(column='embeddings')
 
-        # worker = cpu_count()
-        # pool = Pool(worker)
+        worker = cpu_count()
+        pool = Pool(worker)
         # # Introduce batches(?)
-        # embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
+        embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
         # # To-Do: Make sure that the embeddings are normalized
-        faiss_index = faiss.IndexFlatIP(256)
-        for i in range(len(embeddings)):
-             faiss_index.add(embeddings[i])
+        #faiss_index = faiss.IndexFlatIP(256)
+        #for i in range(len(embeddings)):
+        #     faiss_index.add(embeddings[i])
 
         logger.info("Search products...")
         # # To-Do: Replace iteration
