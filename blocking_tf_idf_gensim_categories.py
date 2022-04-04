@@ -1,9 +1,6 @@
-import gc
 import itertools
 import logging
-import os
 import re
-import time
 from collections import defaultdict
 
 import gensim
@@ -141,64 +138,6 @@ def search_tfidf_gensim(doc_brand, k_hits):
             new_candidate_pairs_real_ids.append(candidate_pair)
 
     return new_candidate_pairs_real_ids
-
-
-def search_per_doc_brand(doc_brand, k_hits):
-    new_candidate_pairs_real_ids = []
-    goup_ids = [i for i in range(len(doc_brand.values()))]
-    group2id_1 = dict(zip(goup_ids, doc_brand.values()))
-
-    #tokenized_corpus = [tokenize(value) for value in doc_brand.keys()]
-    corpus = list(doc_brand.keys())
-
-    candidate_group_pairs = search_bm25(corpus, k_hits)
-
-    candidate_group_pairs = list(set(candidate_group_pairs))
-
-    for pair in candidate_group_pairs:
-        real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
-        real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
-
-        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-            if real_id1 < real_id2:
-                candidate_pair = (real_id1, real_id2)
-            elif real_id1 > real_id2:
-                candidate_pair = (real_id2, real_id1)
-            else:
-                continue
-            new_candidate_pairs_real_ids.append(candidate_pair)
-
-    return new_candidate_pairs_real_ids
-
-
-def search_bm25(tokenized_corpus, k):
-    # Index Corpus
-    bm25 = BM25(min_df=2, max_df=15)
-    bm25.fit(tokenized_corpus)
-
-    # Search Corpus
-    candidate_group_pairs = []
-    for index in range(len(tokenized_corpus)):
-        if index < len(tokenized_corpus):
-            query = tokenized_corpus[index]
-            doc_scores = bm25.transform(query)
-            # doc_scores = bm25.get_scores(query)
-            #hits = np.argsort(doc_scores)[::-1][:k]
-            for top_id in np.argsort(doc_scores)[::-1][:k]:
-                if index != top_id and np.amax(doc_scores) > 0:
-                    normalized_score = doc_scores[top_id] / np.amax(doc_scores)
-                    if normalized_score < 0.2:
-                        break
-
-                    if index < top_id:
-                        candidate_group_pair = (index, top_id)
-                    else:
-                        candidate_group_pair = (top_id, index)
-
-                    candidate_group_pairs.append(candidate_group_pair)
-
-    #print('Result length: {}'.format(len(candidate_group_pairs)))
-    return candidate_group_pairs
 
 
 def preprocess_input(doc, stop_words, regex_list):
