@@ -15,7 +15,7 @@ from gensim.models import TfidfModel
 
 
 
-def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands, parallel):  # replace with your logic.
+def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -28,19 +28,24 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits, brands, parallel):  # 
     regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
 
     logger.info("Preprocessing products...")
+    worker = cpu_count()
+    pool = Pool(worker)
+    X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
+    pool.close()
+    pool.join()
+
     docbrand2pattern2id = defaultdict(lambda: defaultdict(list))
+    logger.info("Group products...")
     for i in tqdm(range(X.shape[0])):
-        doc = ' '.join(
-            [str(X[attr][i]) for attr in attrs if
-             not (type(X[attr][i]) is float and np.isnan(X[attr][i]))]).lower()
+        pattern = X['preprocessed'][i]
+
         doc_brand = 'Null'
         for brand in brands:
-            if brand in doc:
+            if brand in pattern:
                 doc_brand = brand
                 break
 
-        pattern_1 = preprocess_input(doc, stop_words, regex_list)
-        docbrand2pattern2id[doc_brand][pattern_1].append(X['id'][i])
+        docbrand2pattern2id[doc_brand][pattern].append(X['id'][i])
 
 
     # Prepare pairs deduced from groups while waiting for search results
@@ -94,6 +99,7 @@ def tokenize_tfidf_vectorizer(value):
 
 
 def search_tfidf_gensim(doc_brand, k_hits):
+    logger = logging.getLogger()
     candidate_group_pairs = []
     tokenized_corpus = [tokenize(product) for product in doc_brand.keys()]
     dct = corpora.Dictionary(tokenized_corpus)
@@ -104,18 +110,20 @@ def search_tfidf_gensim(doc_brand, k_hits):
 
     tfidf = TfidfModel(corpus)
     corpus_tfidf = tfidf[corpus]
-    index = gensim.similarities.MatrixSimilarity(tfidf[corpus], num_features=len(dct))
+    logger.info('Create Similarity Matrix')
+    index = gensim.similarities.SparseMatrixSimilarity(tfidf[corpus], num_features=len(dct), num_best=k_hits)
     sims = index[corpus_tfidf]
 
-    for i in range(len(sims)):
-        top_hits = np.argsort(sims[i])[::-1][:k_hits]
-        for top_id in top_hits:
-            if i != top_id.item():
+    logger.info('Collect similarities')
+    for index in range(len(sims)):
+        for hit in sims[index]:
+            top_id, _ = hit
+            if index != top_id:
                 # sims[i][top_id.item()] > 0.2:
-                if i < top_id.item():
-                    candidate_group_pair = (i, top_id.item())
+                if index < top_id:
+                    candidate_group_pair = (index, top_id)
                 else:
-                    candidate_group_pair = (top_id.item(), i)
+                    candidate_group_pair = (top_id, index)
 
                 candidate_group_pairs.append(candidate_group_pair)
 
@@ -140,8 +148,13 @@ def search_tfidf_gensim(doc_brand, k_hits):
     return new_candidate_pairs_real_ids
 
 
-def preprocess_input(doc, stop_words, regex_list):
-    # To-Do: Improve tokenizer
+def preprocess_input(doc):
+    doc = doc[0].lower()
+
+    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
+
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
 
@@ -151,8 +164,8 @@ def preprocess_input(doc, stop_words, regex_list):
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
-    return doc[:64]
 
+    return doc[:64]
 
 
 def save_output(X1_candidate_pairs,
@@ -195,7 +208,7 @@ if __name__ == '__main__':
     k_x_1 = 2
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp', 'hewlett-packard' 'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1, brands_x_1, parallel=True)
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=True)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -203,7 +216,7 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 3
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2, brands_x_2, parallel=True)
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, parallel=True)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 

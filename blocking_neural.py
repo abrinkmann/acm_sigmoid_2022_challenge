@@ -24,7 +24,6 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
 
     logger = logging.getLogger()
 
-
     logger.info("Preprocessing products...")
     worker = cpu_count()
     pool = Pool(worker)
@@ -105,7 +104,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     logger.info("Search products...")
     # # To-Do: Replace iteration
     candidate_group_pairs = []
-    for index in range(len(embeddings)):
+    for index in tqdm(range(len(embeddings))):
         embedding = np.array([embeddings[index]])
         D, I = faiss_index.search(embedding, k_hits)
         for distance, top_id in zip(D[0], I[0]):
