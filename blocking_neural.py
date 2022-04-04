@@ -8,7 +8,6 @@ import faiss
 import torch
 
 import numpy as np
-from multiprocess.pool import Pool
 from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
