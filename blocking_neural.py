@@ -69,8 +69,9 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
         from datasets import Dataset
         logger.info("Encode & Embed entities...")
+        embeddings = []
         for example in tqdm(list(pattern2id_1.keys())):
-            encode_and_embed(example)
+            embeddings.append(encode_and_embed(example))
         # ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
         # ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode_and_embed(examples['corpus'])}, batched=True,
         #                             batch_size=16, num_proc=cpu_count())
@@ -81,9 +82,9 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         # # Introduce batches(?)
         # embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
         # # To-Do: Make sure that the embeddings are normalized
-        # faiss_index = faiss.IndexFlatIP(256)
-        # for i in range(len(embedded_corpus)):
-        #     faiss_index.add(embedded_corpus[i])
+        faiss_index = faiss.IndexFlatIP(256)
+        for i in range(len(embeddings)):
+             faiss_index.add(embeddings[i])
 
         logger.info("Search products...")
         # # To-Do: Replace iteration
