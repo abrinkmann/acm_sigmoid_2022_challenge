@@ -8,13 +8,12 @@ import faiss
 import torch
 
 import numpy as np
-from multiprocess.pool import Pool
+#from multiprocess.pool import Pool
 from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
-
-
+from datasets import Dataset
 
 def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your logic.
     '''
@@ -59,29 +58,29 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
         model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
-        def encode_and_embed(example):
+        def encode_and_embed(examples):
             # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-            tokenized_output = tokenizer([example], padding=True, truncation=True, max_length=64)
+            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
             encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
                                    attention_mask=torch.tensor(tokenized_output['attention_mask']),
                                    token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
             result = encoded_output['pooler_output'].detach().numpy()
             return result
 
-        from datasets import Dataset
+
         logger.info("Encode & Embed entities...")
         #embeddings = []
         #for example in tqdm(list(pattern2id_1.keys())):
         #    embeddings.append(encode_and_embed(example))
-        # ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
-        # ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode_and_embed(examples['corpus'])}, batched=True,
-        #                             batch_size=16, num_proc=cpu_count())
-        # ds_with_embeddings.add_faiss_index(column='embeddings')
+        ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
+        ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode_and_embed(examples['corpus'])}, batched=True,
+                                     batch_size=16, num_proc=cpu_count())
+        ds_with_embeddings.add_faiss_index(column='embeddings')
 
-        worker = cpu_count()
-        pool = Pool(worker)
+        #worker = cpu_count()
+        #pool = Pool(worker)
         # # Introduce batches(?)
-        embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
+        #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
         # # To-Do: Make sure that the embeddings are normalized
         #faiss_index = faiss.IndexFlatIP(256)
         #for i in range(len(embeddings)):
