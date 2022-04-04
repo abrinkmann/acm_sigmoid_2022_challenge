@@ -102,7 +102,7 @@ def search_tfidf_gensim(doc_brand, k_hits):
     tokenized_corpus = [tokenize(product) for product in doc_brand.keys()]
     dct = corpora.Dictionary(tokenized_corpus)
     if len(tokenized_corpus) > 10: # fit dictionary
-        dct.filter_extremes(no_below=2, no_above=0.75)
+        dct.filter_extremes(no_below=2, no_above=0.2)
 
     corpus = [dct.doc2bow(product) for product in tokenized_corpus]
 
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     k_x_1 = 2
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp', 'hewlett-packard' 'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=True)
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 3
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, parallel=True)
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, parallel=False)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
