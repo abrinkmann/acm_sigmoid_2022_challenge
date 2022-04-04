@@ -38,13 +38,11 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
     logger.info("Group products...")
     for i in tqdm(range(X.shape[0])):
         pattern = X['preprocessed'][i]
-
         doc_brand = 'Null'
         for brand in brands:
             if brand in pattern:
                 doc_brand = brand
                 break
-
         docbrand2pattern2id[doc_brand][pattern].append(X['id'][i])
 
 
@@ -149,7 +147,7 @@ def search_tfidf_gensim(doc_brand, k_hits):
 
 
 def preprocess_input(doc):
-    doc = doc[0].lower()
+    doc = doc.lower()
 
     stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
