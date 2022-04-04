@@ -109,7 +109,7 @@ def search_tfidf_gensim(doc_brand, k_hits):
     tfidf = TfidfModel(corpus)
     corpus_tfidf = tfidf[corpus]
     logger.info('Create Similarity Matrix')
-    index = gensim.similarities.Similarity(output_prefix=None, corpus=tfidf[corpus], num_features=len(dct), num_best=k_hits)
+    index = gensim.similarities.SparseMatrixSimilarity(corpus=tfidf[corpus], num_features=len(dct), num_best=k_hits)
     sims = index[corpus_tfidf]
 
     logger.info('Collect similarities')
