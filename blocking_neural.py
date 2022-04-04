@@ -84,9 +84,9 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
             for i in tqdm(range(0, len(lst), n)):
                 yield lst[i:i + n]
 
-        embeddings = []
+        embeddings = np.empty((0, 256), np.float32)
         for examples in chunks(list(pattern2id_1.keys()), 256):
-            embeddings.append(encode_and_embed(examples))
+            embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
         #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
         #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
         #                             batch_size=16, num_proc=cpu_count())
@@ -97,25 +97,24 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         # # Introduce batches(?)
         #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
         # # To-Do: Make sure that the embeddings are normalized
+        logger.info('Add embeddings to faiss index')
         faiss_index = faiss.IndexFlatIP(256)
-        for i in range(len(embeddings)):
-             faiss_index.add(embeddings[i])
+        faiss_index.add(embeddings)
 
         logger.info("Search products...")
         # # To-Do: Replace iteration
         candidate_group_pairs = []
-        for index in range(len(embeddings)):
-            D, I = faiss_index.search(embeddings[index], k_hits)
-            for i in range(0, len(I)):
-                for distance, top_id in zip(D[i], I[i]):
-                    if index == top_id:
-                        continue
-                    elif index < top_id:
-                        candidate_group_pair = (index, top_id)
-                    else:
-                        candidate_group_pair = (top_id, index)
+        D, I = faiss_index.search(embeddings, k_hits)
+        for index in tqdm(range(0, len(I))):
+            for distance, top_id in zip(D[index], I[index]):
+                if index == top_id:
+                    continue
+                elif index < top_id:
+                    candidate_group_pair = (index, top_id)
+                else:
+                    candidate_group_pair = (top_id, index)
 
-                    candidate_group_pairs.append(candidate_group_pair)
+                candidate_group_pairs.append(candidate_group_pair)
 
         candidate_group_pairs = list(set(candidate_group_pairs))
         if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
