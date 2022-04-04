@@ -3,6 +3,7 @@ import itertools
 import logging
 import re
 from collections import defaultdict
+from multiprocessing import Pool
 
 import faiss
 import torch
@@ -23,18 +24,13 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
     '''
 
     logger = logging.getLogger()
-    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '-$', ':\s', '\(', '\)', ',']
+
 
     logger.info("Preprocessing products...")
+    X = parallel_processing(X, preprocess_dataframe)
     pattern2id_1 = defaultdict(list)
     for i in tqdm(range(X.shape[0])):
-        doc = ' '.join(
-            [str(X[attr][i]) for attr in attrs if
-             not (type(X[attr][i]) is float and np.isnan(X[attr][i]))]).lower()
-        pattern_1 = preprocess_input(doc, stop_words, regex_list)
-        pattern2id_1[pattern_1].append(X['id'][i])
+        pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
     goup_ids = [i for i in range(len(pattern2id_1))]
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
@@ -84,7 +80,7 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
             yield lst[i:i + n]
 
     embeddings = np.empty((0, 256), np.float32)
-    for examples in chunks(list(pattern2id_1.keys()), 256):
+    for examples in chunks(list(pattern2id_1.keys()), 512):
         embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
     #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
     #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
@@ -135,9 +131,31 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
     return candidate_pairs_real_ids
 
+def parallel_processing(X, func):
+    worker = cpu_count()
+    pool = Pool(worker)
+    X_split = np.array_split(X, worker)
+    X_split = pool.map(func, tqdm(X_split))
+    pool.close()
+    pool.join()
 
-def preprocess_input(doc, stop_words, regex_list):
-    # To-Do: Improve tokenizer
+    return pd.concat(X_split)
+
+
+def preprocess_dataframe(X):
+    return X.apply(preprocess_input, axis=1)
+
+
+def preprocess_input(row):
+    attrs = ['title', 'name']
+    doc = ' '.join(
+        [str(row[attr]) for attr in attrs if attr in row and \
+         not (type(row[attr]) is float and np.isnan(row[attr]))]).lower()
+
+    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
+
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
 
@@ -147,7 +165,9 @@ def preprocess_input(doc, stop_words, regex_list):
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
-    return doc[:64]
+    row['preprocessed'] = doc[:64]
+
+    return row
 
 
 def save_output(X1_candidate_pairs,
