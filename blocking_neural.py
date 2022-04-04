@@ -79,9 +79,10 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         for i in tqdm(range(0, len(lst), n)):
             yield lst[i:i + n]
 
-    embeddings = np.empty((0, 256), np.float32)
+    embeddings = np.empty((0, 256), dtype=np.float32)
     for examples in chunks(list(pattern2id_1.keys()), 512):
         embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
+    #embeddings = list(itertools.chain(*embeddings))
     #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
     #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
     #                             batch_size=16, num_proc=cpu_count())
@@ -91,17 +92,31 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
     #pool = Pool(worker)
     # # Introduce batches(?)
     #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
+
+    d = 64  # dimension
+    nb = 100000  # database size
+    nq = 10000  # nb of queries
+    np.random.seed(1234)  # make reproducible
+    xb = np.random.random((nb, d)).astype('float32')
+    xb[:, 0] += np.arange(nb) / 1000.
+    xq = np.random.random((nq, d)).astype('float32')
+    xq[:, 0] += np.arange(nq) / 1000.
+
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Add embeddings to faiss index')
     faiss_index = faiss.IndexFlatIP(256)
     faiss_index.add(embeddings)
+    #for embedding in embeddings:
+    #    embedding = np.array(embedding).astype('float32')
+
 
     logger.info("Search products...")
     # # To-Do: Replace iteration
     candidate_group_pairs = []
-    D, I = faiss_index.search(embeddings, k_hits)
-    for index in tqdm(range(0, len(I))):
-        for distance, top_id in zip(D[index], I[index]):
+    for index in range(len(embeddings)):
+        embedding = np.array([embeddings[index]])
+        D, I = faiss_index.search(embedding, k_hits)
+        for distance, top_id in zip(D[0], I[0]):
             if index == top_id:
                 continue
             elif index < top_id:
