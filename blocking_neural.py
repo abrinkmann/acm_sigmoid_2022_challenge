@@ -81,12 +81,12 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
         def chunks(lst, n):
             """Yield successive n-sized chunks from lst."""
-            for i in range(0, len(lst), n):
+            for i in tqdm(range(0, len(lst), n)):
                 yield lst[i:i + n]
 
         embeddings = []
-        for example in tqdm(chunks(list(pattern2id_1.keys()), 128)):
-            embeddings.append(encode_and_embed(example))
+        for examples in chunks(list(pattern2id_1.keys()), 256):
+            embeddings.append(encode_and_embed(examples))
         #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
         #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
         #                             batch_size=16, num_proc=cpu_count())
@@ -97,43 +97,43 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         # # Introduce batches(?)
         #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
         # # To-Do: Make sure that the embeddings are normalized
-        #faiss_index = faiss.IndexFlatIP(256)
-        #for i in range(len(embeddings)):
-        #     faiss_index.add(embeddings[i])
+        faiss_index = faiss.IndexFlatIP(256)
+        for i in range(len(embeddings)):
+             faiss_index.add(embeddings[i])
 
         logger.info("Search products...")
         # # To-Do: Replace iteration
-        # candidate_group_pairs = []
-        # for index in range(len(embedded_corpus)):
-        #     D, I = faiss_index.search(embedded_corpus[index], k_hits)
-        #     for i in range(0, len(I)):
-        #         for distance, top_id in zip(D[i], I[i]):
-        #             if index == top_id:
-        #                 continue
-        #             elif index < top_id:
-        #                 candidate_group_pair = (index, top_id)
-        #             else:
-        #                 candidate_group_pair = (top_id, index)
-        #
-        #             candidate_group_pairs.append(candidate_group_pair)
-        #
-        # candidate_group_pairs = list(set(candidate_group_pairs))
-        # if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
-        #     candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
-        #
-        # logger.info('GroupIds to real ids')
-        # for pair in tqdm(candidate_group_pairs):
-        #     real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
-        #     real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
-        #
-        #     for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-        #         if real_id1 < real_id2:
-        #             candidate_pair = (real_id1, real_id2)
-        #         elif real_id1 > real_id2:
-        #             candidate_pair = (real_id2, real_id1)
-        #         else:
-        #             continue
-        #         candidate_pairs_real_ids.append(candidate_pair)
+        candidate_group_pairs = []
+        for index in range(len(embeddings)):
+            D, I = faiss_index.search(embeddings[index], k_hits)
+            for i in range(0, len(I)):
+                for distance, top_id in zip(D[i], I[i]):
+                    if index == top_id:
+                        continue
+                    elif index < top_id:
+                        candidate_group_pair = (index, top_id)
+                    else:
+                        candidate_group_pair = (top_id, index)
+
+                    candidate_group_pairs.append(candidate_group_pair)
+
+        candidate_group_pairs = list(set(candidate_group_pairs))
+        if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
+            candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
+
+        logger.info('GroupIds to real ids')
+        for pair in tqdm(candidate_group_pairs):
+            real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
+            real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
+
+            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+                if real_id1 < real_id2:
+                    candidate_pair = (real_id1, real_id2)
+                elif real_id1 > real_id2:
+                    candidate_pair = (real_id2, real_id1)
+                else:
+                    continue
+                candidate_pairs_real_ids.append(candidate_pair)
 
     return candidate_pairs_real_ids
 
