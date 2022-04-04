@@ -9,14 +9,13 @@ import faiss
 import torch
 
 import numpy as np
-#from multiprocess.pool import Pool
 from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 from datasets import Dataset
 
-def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your logic.
+def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -27,8 +26,14 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
 
     logger.info("Preprocessing products...")
-    X = parallel_processing(X, preprocess_dataframe)
+    worker = cpu_count()
+    pool = Pool(worker)
+    X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
+    pool.close()
+    pool.join()
+
     pattern2id_1 = defaultdict(list)
+    logger.info("Group products...")
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
@@ -80,7 +85,7 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
             yield lst[i:i + n]
 
     embeddings = np.empty((0, 256), dtype=np.float32)
-    for examples in chunks(list(pattern2id_1.keys()), 512):
+    for examples in chunks(list(pattern2id_1.keys()), 256):
         embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
     #embeddings = list(itertools.chain(*embeddings))
     #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
@@ -88,19 +93,8 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
     #                             batch_size=16, num_proc=cpu_count())
     #ds_with_embeddings.add_faiss_index(column='embeddings')
 
-    #worker = cpu_count()
-    #pool = Pool(worker)
     # # Introduce batches(?)
     #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
-
-    d = 64  # dimension
-    nb = 100000  # database size
-    nq = 10000  # nb of queries
-    np.random.seed(1234)  # make reproducible
-    xb = np.random.random((nb, d)).astype('float32')
-    xb[:, 0] += np.arange(nb) / 1000.
-    xq = np.random.random((nq, d)).astype('float32')
-    xq[:, 0] += np.arange(nq) / 1000.
 
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Add embeddings to faiss index')
@@ -161,11 +155,8 @@ def preprocess_dataframe(X):
     return X.apply(preprocess_input, axis=1)
 
 
-def preprocess_input(row):
-    attrs = ['title', 'name']
-    doc = ' '.join(
-        [str(row[attr]) for attr in attrs if attr in row and \
-         not (type(row[attr]) is float and np.isnan(row[attr]))]).lower()
+def preprocess_input(doc):
+    doc = doc[0].lower()
 
     stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
@@ -180,9 +171,8 @@ def preprocess_input(row):
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
-    row['preprocessed'] = doc[:64]
 
-    return row
+    return doc[:64]
 
 
 def save_output(X1_candidate_pairs,
