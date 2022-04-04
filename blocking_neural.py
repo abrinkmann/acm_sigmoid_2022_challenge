@@ -52,87 +52,86 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
-    if len(candidate_pairs_real_ids) < expected_cand_size:
-        logger.info("Load models...")
+    logger.info("Load models...")
 
-        tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-        model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+    model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
-        # def encode(examples):
-        #     # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-        #     tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
-        #     #encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-        #     #                       attention_mask=torch.tensor(tokenized_output['attention_mask']),
-        #     #                       token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
-        #     #result = encoded_output['pooler_output'].detach().numpy()
-        #     return tokenized_output['input_ids']
+    # def encode(examples):
+    #     # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+    #     tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
+    #     #encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
+    #     #                       attention_mask=torch.tensor(tokenized_output['attention_mask']),
+    #     #                       token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+    #     #result = encoded_output['pooler_output'].detach().numpy()
+    #     return tokenized_output['input_ids']
 
-        def encode_and_embed(examples):
-            # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
-            encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-                                   attention_mask=torch.tensor(tokenized_output['attention_mask']),
-                                   token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
-            result = encoded_output['pooler_output'].detach().numpy()
-            return result
+    def encode_and_embed(examples):
+        # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+        tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
+        encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
+                               attention_mask=torch.tensor(tokenized_output['attention_mask']),
+                               token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+        result = encoded_output['pooler_output'].detach().numpy()
+        return result
 
 
-        logger.info("Encode & Embed entities...")
+    logger.info("Encode & Embed entities...")
 
-        def chunks(lst, n):
-            """Yield successive n-sized chunks from lst."""
-            for i in tqdm(range(0, len(lst), n)):
-                yield lst[i:i + n]
+    def chunks(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in tqdm(range(0, len(lst), n)):
+            yield lst[i:i + n]
 
-        embeddings = np.empty((0, 256), np.float32)
-        for examples in chunks(list(pattern2id_1.keys()), 256):
-            embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
-        #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
-        #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
-        #                             batch_size=16, num_proc=cpu_count())
-        #ds_with_embeddings.add_faiss_index(column='embeddings')
+    embeddings = np.empty((0, 256), np.float32)
+    for examples in chunks(list(pattern2id_1.keys()), 256):
+        embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
+    #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
+    #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
+    #                             batch_size=16, num_proc=cpu_count())
+    #ds_with_embeddings.add_faiss_index(column='embeddings')
 
-        #worker = cpu_count()
-        #pool = Pool(worker)
-        # # Introduce batches(?)
-        #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
-        # # To-Do: Make sure that the embeddings are normalized
-        logger.info('Add embeddings to faiss index')
-        faiss_index = faiss.IndexFlatIP(256)
-        faiss_index.add(embeddings)
+    #worker = cpu_count()
+    #pool = Pool(worker)
+    # # Introduce batches(?)
+    #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
+    # # To-Do: Make sure that the embeddings are normalized
+    logger.info('Add embeddings to faiss index')
+    faiss_index = faiss.IndexFlatIP(256)
+    faiss_index.add(embeddings)
 
-        logger.info("Search products...")
-        # # To-Do: Replace iteration
-        candidate_group_pairs = []
-        D, I = faiss_index.search(embeddings, k_hits)
-        for index in tqdm(range(0, len(I))):
-            for distance, top_id in zip(D[index], I[index]):
-                if index == top_id:
-                    continue
-                elif index < top_id:
-                    candidate_group_pair = (index, top_id)
-                else:
-                    candidate_group_pair = (top_id, index)
+    logger.info("Search products...")
+    # # To-Do: Replace iteration
+    candidate_group_pairs = []
+    D, I = faiss_index.search(embeddings, k_hits)
+    for index in tqdm(range(0, len(I))):
+        for distance, top_id in zip(D[index], I[index]):
+            if index == top_id:
+                continue
+            elif index < top_id:
+                candidate_group_pair = (index, top_id)
+            else:
+                candidate_group_pair = (top_id, index)
 
-                candidate_group_pairs.append(candidate_group_pair)
+            candidate_group_pairs.append(candidate_group_pair)
 
-        candidate_group_pairs = list(set(candidate_group_pairs))
-        if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
-            candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
+    candidate_group_pairs = list(set(candidate_group_pairs))
+    if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
+        candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
 
-        logger.info('GroupIds to real ids')
-        for pair in tqdm(candidate_group_pairs):
-            real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
-            real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
+    logger.info('GroupIds to real ids')
+    for pair in tqdm(candidate_group_pairs):
+        real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
+        real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
 
-            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-                if real_id1 < real_id2:
-                    candidate_pair = (real_id1, real_id2)
-                elif real_id1 > real_id2:
-                    candidate_pair = (real_id2, real_id1)
-                else:
-                    continue
-                candidate_pairs_real_ids.append(candidate_pair)
+        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+            if real_id1 < real_id2:
+                candidate_pair = (real_id1, real_id2)
+            elif real_id1 > real_id2:
+                candidate_pair = (real_id2, real_id1)
+            else:
+                continue
+            candidate_pairs_real_ids.append(candidate_pair)
 
     return candidate_pairs_real_ids
 
