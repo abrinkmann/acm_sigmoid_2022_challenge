@@ -58,6 +58,15 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
         tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
         model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
+        # def encode(examples):
+        #     # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+        #     tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
+        #     #encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
+        #     #                       attention_mask=torch.tensor(tokenized_output['attention_mask']),
+        #     #                       token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+        #     #result = encoded_output['pooler_output'].detach().numpy()
+        #     return tokenized_output['input_ids']
+
         def encode_and_embed(examples):
             # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
             tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
@@ -69,13 +78,19 @@ def block_with_bm25(X, attrs, expected_cand_size, k_hits):  # replace with your 
 
 
         logger.info("Encode & Embed entities...")
-        #embeddings = []
-        #for example in tqdm(list(pattern2id_1.keys())):
-        #    embeddings.append(encode_and_embed(example))
-        ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
-        ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode_and_embed(examples['corpus'])}, batched=True,
-                                     batch_size=16, num_proc=cpu_count())
-        ds_with_embeddings.add_faiss_index(column='embeddings')
+
+        def chunks(lst, n):
+            """Yield successive n-sized chunks from lst."""
+            for i in range(0, len(lst), n):
+                yield lst[i:i + n]
+
+        embeddings = []
+        for example in tqdm(chunks(list(pattern2id_1.keys()), 128)):
+            embeddings.append(encode_and_embed(example))
+        #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
+        #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
+        #                             batch_size=16, num_proc=cpu_count())
+        #ds_with_embeddings.add_faiss_index(column='embeddings')
 
         #worker = cpu_count()
         #pool = Pool(worker)
