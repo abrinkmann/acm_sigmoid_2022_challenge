@@ -100,8 +100,6 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     logger.info('Add embeddings to faiss index')
     faiss_index = faiss.IndexFlatIP(256)
     faiss_index.add(embeddings)
-    #for embedding in embeddings:
-    #    embedding = np.array(embedding).astype('float32')
 
 
     logger.info("Search products...")
