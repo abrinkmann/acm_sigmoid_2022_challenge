@@ -59,13 +59,19 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
                     candidate_pairs_real_ids.append((ids[j], ids[k]))
 
     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
-    worker = 4
-    pool = Pool(worker)
+
 
     logger.info('Start search')
     if parallel:
+        worker = 4
+        pool = Pool(worker)
+
         new_candidate_pairs_real_ids = pool.starmap(search_tfidf_gensim, zip(docbrand2pattern2id.values(),
                                                                       itertools.repeat(k_hits)))
+
+        pool.close()
+        pool.join()
+
     else:
 
         for doc_brand in docbrand2pattern2id.values():
@@ -77,9 +83,6 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
             candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
     logger.info('Finished search')
-
-    pool.close()
-    pool.join()
 
     return candidate_pairs_real_ids
 
@@ -107,24 +110,24 @@ def search_tfidf_gensim(doc_brand, k_hits):
     corpus = [dct.doc2bow(product) for product in tokenized_corpus]
 
     tfidf = TfidfModel(corpus)
-    corpus_tfidf = tfidf[corpus]
+    #corpus_tfidf = tfidf[corpus]
     logger.info('Create Similarity Matrix')
-    index = gensim.similarities.SparseMatrixSimilarity(corpus=tfidf[corpus], num_features=len(dct), num_best=k_hits,
-                                                       chunksize=64)
-    sims = index[corpus_tfidf]
+    index = gensim.similarities.Similarity(output_prefix=None, corpus=tfidf[corpus], num_features=len(dct), num_best=k_hits,
+                                           chunksize=128)
 
     logger.info('Collect similarities')
-    for index in range(len(sims)):
-        for hit in sims[index]:
+    i = 0
+    for sims in index:
+        for hit in sims:
             top_id, _ = hit
-            if index != top_id:
-                # sims[i][top_id.item()] > 0.2:
-                if index < top_id:
-                    candidate_group_pair = (index, top_id)
+            if i != top_id:
+                if i < top_id:
+                    candidate_group_pair = (i, top_id)
                 else:
-                    candidate_group_pair = (top_id, index)
+                    candidate_group_pair = (top_id, i)
 
                 candidate_group_pairs.append(candidate_group_pair)
+        i += 1
 
     candidate_group_pairs = list(set(candidate_group_pairs))
     new_candidate_pairs_real_ids = []
