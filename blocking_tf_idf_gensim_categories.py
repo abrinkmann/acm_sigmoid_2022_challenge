@@ -88,9 +88,10 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
             p.start()
             processes.append(p)
 
-        while not input_queue.empty():
-            time.sleep(1)
-        input_queue.close()
+        #while not input_queue.empty():
+        #    time.sleep(1)
+        #input_queue.close()
+        #input_queue.join_thread()
 
         while not output_queue.empty():
             new_candidate_pairs_real_ids = output_queue.get()
@@ -105,7 +106,8 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
                     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
             process.join()
 
-        output_queue.close()
+        #output_queue.close()
+        #output_queue.join_thread()
 
     logger.info('Finished search')
 
@@ -176,9 +178,6 @@ def search_tfidf_gensim(input_queue, output_queue, k_hits):
                 new_candidate_pairs_real_ids.append(candidate_pair)
 
         output_queue.put(new_candidate_pairs_real_ids)
-    print('Done')
-    return
-
 
 def preprocess_input(doc):
     doc = doc.lower()
