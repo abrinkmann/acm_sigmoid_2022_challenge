@@ -80,7 +80,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         for doc_brand in docbrand2pattern2id.values():
             input_queue.put(doc_brand)
 
-        worker = 4
+        worker = 3
         processes = []
 
         for i in range(worker):
@@ -91,6 +91,11 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         while not input_queue.empty():
             time.sleep(1)
         input_queue.close()
+
+        while not output_queue.empty():
+            new_candidate_pairs_real_ids = output_queue.get()
+            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+            candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
         for process in processes:
             while process.is_alive():
