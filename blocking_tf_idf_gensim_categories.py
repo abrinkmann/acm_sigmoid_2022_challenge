@@ -1,10 +1,11 @@
 import itertools
 import logging
 import re
+import time
 from collections import defaultdict
 
 import gensim
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue, Process
 
 import numpy as np
 from gensim import corpora
@@ -73,14 +74,33 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         pool.join()
 
     else:
-
+        # Fill input queue
+        input_queue = Queue()
+        output_queue = Queue()
         for doc_brand in docbrand2pattern2id.values():
-            if len(candidate_pairs_real_ids) > expected_cand_size:
-                break
+            input_queue.put(doc_brand)
 
-            new_candidate_pairs_real_ids = search_tfidf_gensim(doc_brand, k_hits)
-            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-            candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+        worker = 4
+        processes = []
+
+        for i in range(worker):
+            p = Process(target=search_tfidf_gensim, args=(input_queue, output_queue, k_hits,))
+            p.start()
+            processes.append(p)
+
+        while not input_queue.empty():
+            time.sleep(1)
+        input_queue.close()
+
+        for process in processes:
+            while process.is_alive():
+                while not output_queue.empty():
+                    new_candidate_pairs_real_ids = output_queue.get()
+                    candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+                    candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+            process.join()
+
+        output_queue.close()
 
     logger.info('Finished search')
 
@@ -98,56 +118,61 @@ def tokenize_tfidf_vectorizer(value):
     return tokens
 
 
-def search_tfidf_gensim(doc_brand, k_hits):
-    logger = logging.getLogger()
-    candidate_group_pairs = []
-    tokenized_corpus = [tokenize(product) for product in doc_brand.keys()]
-    dct = corpora.Dictionary(tokenized_corpus)
-    abs_max_df = 30
-    if len(tokenized_corpus) > abs_max_df: # fit dictionary
-        dct.filter_extremes(no_below=2, no_above=abs_max_df/len(tokenized_corpus))
+def search_tfidf_gensim(input_queue, output_queue, k_hits):
 
-    corpus = [dct.doc2bow(product) for product in tokenized_corpus]
+    while not input_queue.empty():
+        doc_brand = input_queue.get()
+        logger = logging.getLogger()
+        candidate_group_pairs = []
+        tokenized_corpus = [tokenize(product) for product in doc_brand.keys()]
+        dct = corpora.Dictionary(tokenized_corpus)
+        abs_max_df = 30
+        if len(tokenized_corpus) > abs_max_df: # fit dictionary
+            dct.filter_extremes(no_below=2, no_above=abs_max_df/len(tokenized_corpus))
 
-    tfidf = TfidfModel(corpus)
-    #corpus_tfidf = tfidf[corpus]
-    logger.info('Create Similarity Matrix')
-    index = gensim.similarities.Similarity(output_prefix=None, corpus=tfidf[corpus], num_features=len(dct),
-                                           num_best=k_hits)
+        corpus = [dct.doc2bow(product) for product in tokenized_corpus]
 
-    logger.info('Collect similarities')
-    i = 0
-    for sims in index:
-        for hit in sims:
-            top_id, _ = hit
-            if i != top_id:
-                if i < top_id:
-                    candidate_group_pair = (i, top_id)
+        tfidf = TfidfModel(corpus)
+        #corpus_tfidf = tfidf[corpus]
+        logger.info('Create Similarity Matrix')
+        index = gensim.similarities.Similarity(output_prefix=None, corpus=tfidf[corpus], num_features=len(dct),
+                                               num_best=k_hits)
+
+        logger.info('Collect similarities')
+        i = 0
+        for sims in index:
+            for hit in sims:
+                top_id, _ = hit
+                if i != top_id:
+                    if i < top_id:
+                        candidate_group_pair = (i, top_id)
+                    else:
+                        candidate_group_pair = (top_id, i)
+
+                    candidate_group_pairs.append(candidate_group_pair)
+            i += 1
+
+        candidate_group_pairs = list(set(candidate_group_pairs))
+        new_candidate_pairs_real_ids = []
+        goup_ids = [i for i in range(len(doc_brand.values()))]
+        group2id_1 = dict(zip(goup_ids, doc_brand.values()))
+
+        for pair in candidate_group_pairs:
+            real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
+            real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
+
+            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+                if real_id1 < real_id2:
+                    candidate_pair = (real_id1, real_id2)
+                elif real_id1 > real_id2:
+                    candidate_pair = (real_id2, real_id1)
                 else:
-                    candidate_group_pair = (top_id, i)
+                    continue
+                new_candidate_pairs_real_ids.append(candidate_pair)
 
-                candidate_group_pairs.append(candidate_group_pair)
-        i += 1
-
-    candidate_group_pairs = list(set(candidate_group_pairs))
-    new_candidate_pairs_real_ids = []
-    goup_ids = [i for i in range(len(doc_brand.values()))]
-    group2id_1 = dict(zip(goup_ids, doc_brand.values()))
-
-    for pair in candidate_group_pairs:
-        real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
-        real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
-
-        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-            if real_id1 < real_id2:
-                candidate_pair = (real_id1, real_id2)
-            elif real_id1 > real_id2:
-                candidate_pair = (real_id2, real_id1)
-            else:
-                continue
-            new_candidate_pairs_real_ids.append(candidate_pair)
-
-    return new_candidate_pairs_real_ids
+        output_queue.put(new_candidate_pairs_real_ids)
+    print('Done')
+    return
 
 
 def preprocess_input(doc):
@@ -156,6 +181,8 @@ def preprocess_input(doc):
     stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
     regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
+
+    doc = doc.replace('hewlett-packard', 'hp')
 
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
@@ -208,7 +235,7 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'china']
 
     k_x_1 = 2
-    brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp', 'hewlett-packard' 'asus', 'panasonic', 'toshiba',
+    brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp',  'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
     X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
