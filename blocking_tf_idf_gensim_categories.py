@@ -16,7 +16,7 @@ from gensim.models import TfidfModel
 
 
 
-def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # replace with your logic.
+def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -64,55 +64,44 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
 
 
     logger.info('Start search')
-    if parallel:
-        worker = 4
-        pool = Pool(worker)
+    # Fill input queue
+    input_queue = Queue()
+    output_queue = Queue()
+    for doc_brand in docbrand2pattern2id.values():
+        input_queue.put(doc_brand)
 
-        new_candidate_pairs_real_ids = pool.starmap(search_tfidf_gensim, zip(docbrand2pattern2id.values(),
-                                                                      itertools.repeat(k_hits)))
+    worker = 4
+    processes = []
 
-        pool.close()
-        pool.join()
+    for i in range(worker):
+        p = Process(target=search_tfidf_gensim, args=(input_queue, output_queue, k_hits,))
+        p.start()
+        processes.append(p)
 
-    else:
-        # Fill input queue
-        input_queue = Queue()
-        output_queue = Queue()
-        for doc_brand in docbrand2pattern2id.values():
-            input_queue.put(doc_brand)
+    while not input_queue.empty():
+        time.sleep(1)
+    input_queue.close()
+    input_queue.join_thread()
 
-        worker = 4
-        processes = []
+    while not output_queue.empty():
+        new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
+        candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+        jaccard_similarities.extend(new_jaccard_similarities)
 
-        for i in range(worker):
-            p = Process(target=search_tfidf_gensim, args=(input_queue, output_queue, k_hits,))
-            p.start()
-            processes.append(p)
+    for process in processes:
+        while process.is_alive():
+            while not output_queue.empty():
+                new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
+                candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
+                jaccard_similarities.extend(new_jaccard_similarities)
 
-        while not input_queue.empty():
-            time.sleep(1)
-        input_queue.close()
-        input_queue.join_thread()
+        process.join()
 
-        while not output_queue.empty():
-            new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
-            candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-            jaccard_similarities.extend(new_jaccard_similarities)
-
-        for process in processes:
-            while process.is_alive():
-                while not output_queue.empty():
-                    new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
-                    candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-                    jaccard_similarities.extend(new_jaccard_similarities)
-
-            process.join()
-
-        time.sleep(0.1)
-        candidate_pairs_real_ids = [x for _, x in
-                                    sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
-        output_queue.close()
-        output_queue.join_thread()
+    time.sleep(0.1)
+    candidate_pairs_real_ids = [x for _, x in
+                                sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
+    output_queue.close()
+    output_queue.join_thread()
 
     logger.info('Finished search')
 
@@ -128,7 +117,6 @@ def tokenize_tfidf_vectorizer(value):
     tokens = token_pattern.findall(value)
 
     return tokens
-
 
 def search_tfidf_gensim(input_queue, output_queue, k_hits):
 
@@ -253,7 +241,7 @@ if __name__ == '__main__':
     k_x_1 = 4
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'hp',  'asus', 'lenovo thinkpad', 'lenovo', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -261,7 +249,7 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 4
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, parallel=False)
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
