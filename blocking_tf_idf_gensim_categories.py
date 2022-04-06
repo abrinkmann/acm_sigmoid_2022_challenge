@@ -16,7 +16,7 @@ from gensim.models import TfidfModel
 
 
 
-def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace with your logic.
+def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, product_types):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -40,11 +40,16 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace wit
     for i in tqdm(range(X.shape[0])):
         pattern = X['preprocessed'][i]
         doc_brand = 'Null'
+        doc_product_type = 'Null'
         for brand in brands:
             if brand in pattern:
                 doc_brand = brand
                 break
-        docbrand2pattern2id[doc_brand][pattern].append(X['id'][i])
+        for product_type in product_types:
+            if product_type in pattern:
+                doc_product_type = product_type
+                break
+        docbrand2pattern2id['{}-{}'.format(doc_brand, doc_product_type)][pattern].append(X['id'][i])
 
 
     # Prepare pairs deduced from groups while waiting for search results
@@ -70,7 +75,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace wit
     for doc_brand in docbrand2pattern2id.values():
         input_queue.put(doc_brand)
 
-    worker = 3
+    worker = 6
     processes = []
 
     for i in range(worker):
@@ -241,7 +246,8 @@ if __name__ == '__main__':
     k_x_1 = 4
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'hp',  'asus', 'lenovo thinkpad', 'lenovo', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
-    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1)
+    product_types_x_1 = []
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, product_types_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -249,7 +255,8 @@ if __name__ == '__main__':
     stop_words_x2 = []
     k_x_2 = 4
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2)
+    product_types_x_2 = ['extreme', 'plus', 'ultra']
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, product_types_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
