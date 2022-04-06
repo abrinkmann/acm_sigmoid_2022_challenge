@@ -248,7 +248,7 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 2
-    batch_sizes = [2, 4, 8, 16, 32, 64, 128]
+    batch_sizes = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     configurations = [{'num_threads': 1, 'worker': 16}, {'num_threads': 2, 'worker': 8},
                       {'num_threads': 4, 'worker': 4}, {'num_threads': 8, 'worker': 2},
                       {'num_threads': 16, 'worker': 1}]
