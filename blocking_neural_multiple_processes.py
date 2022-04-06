@@ -59,12 +59,12 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
             yield lst[i:i + n]
 
     if parallel:
-        input_queue = Queue()
-        output_queue = Queue()
-        logger.info("Encode & Embed entities...")
-
         for batch_size, configuration in itertools.product(batch_sizes, configurations):
             start = time.time()
+            input_queue = Queue()
+            output_queue = Queue()
+
+            logger.info("Encode & Embed entities...")
             worker = configuration['worker']
             processes = []
 
