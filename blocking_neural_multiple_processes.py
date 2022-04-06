@@ -59,6 +59,8 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
             yield lst[i:i + n]
 
     if parallel:
+        with open('hyperparameter.txt', 'w') as f:
+            f.write('Batch Size, Number of Threads, Worker, Processing time\n')
         for batch_size, configuration in itertools.product(batch_sizes, configurations):
             start = time.time()
             input_queue = Queue()
@@ -78,10 +80,10 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
 
             pbar = tqdm(total=int(len(list(X['preprocessed'].values))/batch_size))
 
-            embeddings = np.empty((0, 256), dtype=np.float32)
+            embeddings = []
             while not input_queue.empty():
                 while not output_queue.empty():
-                    embeddings = np.append(embeddings, output_queue.get(), axis=0)
+                    embeddings.append(output_queue.get())
                     pbar.update(1)
 
             input_queue.close()
@@ -90,9 +92,11 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
             for process in processes:
                 while process.is_alive():
                     while not output_queue.empty():
-                        embeddings = np.append(embeddings, output_queue.get(), axis=0)
+                        embeddings.append(output_queue.get())
                         pbar.update(1)
                 process.join()
+
+            embeddings = np.concatenate(embeddings, axis=0)
 
             time.sleep(0.1)
             end = time.time()
@@ -101,6 +105,8 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
                                                                                                      batch_size,
                                                                                                      configuration['num_threads'],
                                                                                                      configuration['worker']))
+            with open('hyperparameter.txt', 'a') as f:
+                f.write('{},{},{},{}\n'.format(batch_size, configuration['num_threads'], configuration['worker'], run_time))
             output_queue.close()
             output_queue.join_thread()
 
