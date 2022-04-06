@@ -60,6 +60,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
                     candidate_pairs_real_ids.append((ids[j], ids[k]))
 
     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+    jaccard_similarities = [1.0] * len(candidate_pairs_real_ids)
 
 
     logger.info('Start search')
@@ -80,7 +81,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         for doc_brand in docbrand2pattern2id.values():
             input_queue.put(doc_brand)
 
-        worker = 3
+        worker = 5
         processes = []
 
         for i in range(worker):
@@ -94,20 +95,22 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         input_queue.join_thread()
 
         while not output_queue.empty():
-            new_candidate_pairs_real_ids = output_queue.get()
+            new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
             candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-            candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+            jaccard_similarities.extend(new_jaccard_similarities)
 
         for process in processes:
             while process.is_alive():
                 while not output_queue.empty():
-                    new_candidate_pairs_real_ids = output_queue.get()
+                    new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
                     candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
-                    candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+                    jaccard_similarities.extend(new_jaccard_similarities)
+
             process.join()
 
         time.sleep(0.1)
-
+        candidate_pairs_real_ids = [x for _, x in
+                                    sorted(zip(jaccard_similarities, candidate_pairs_real_ids), reverse=True)]
         output_queue.close()
         output_queue.join_thread()
 
@@ -163,6 +166,7 @@ def search_tfidf_gensim(input_queue, output_queue, k_hits):
 
         candidate_group_pairs = list(set(candidate_group_pairs))
         new_candidate_pairs_real_ids = []
+        new_jaccard_similarities = []
         goup_ids = [i for i in range(len(doc_brand.values()))]
         group2id_1 = dict(zip(goup_ids, doc_brand.values()))
 
@@ -170,16 +174,22 @@ def search_tfidf_gensim(input_queue, output_queue, k_hits):
             real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
             real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
 
-            for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-                if real_id1 < real_id2:
-                    candidate_pair = (real_id1, real_id2)
-                elif real_id1 > real_id2:
-                    candidate_pair = (real_id2, real_id1)
-                else:
-                    continue
-                new_candidate_pairs_real_ids.append(candidate_pair)
+            s1 = set(tokenized_corpus[pair[0]])
+            s2 = set(tokenized_corpus[pair[1]])
+            jaccard_similarity = len(s1.intersection(s2)) / max(len(s1), len(s2))
 
-        output_queue.put(new_candidate_pairs_real_ids)
+            if jaccard_similarity > 0.2:
+                for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+                    if real_id1 < real_id2:
+                        candidate_pair = (real_id1, real_id2)
+                    elif real_id1 > real_id2:
+                        candidate_pair = (real_id2, real_id1)
+                    else:
+                        continue
+                    new_candidate_pairs_real_ids.append(candidate_pair)
+                    new_jaccard_similarities.append(jaccard_similarity)
+
+        output_queue.put((new_candidate_pairs_real_ids, new_jaccard_similarities))
 
 def preprocess_input(doc):
     doc = doc.lower()
@@ -240,7 +250,7 @@ if __name__ == '__main__':
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'china']
 
-    k_x_1 = 2
+    k_x_1 = 4
     brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp',  'asus', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
     X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
@@ -249,7 +259,7 @@ if __name__ == '__main__':
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    k_x_2 = 3
+    k_x_2 = 4
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
     X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, parallel=False)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
