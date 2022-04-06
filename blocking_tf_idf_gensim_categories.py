@@ -81,7 +81,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, parallel):  # r
         for doc_brand in docbrand2pattern2id.values():
             input_queue.put(doc_brand)
 
-        worker = 5
+        worker = 4
         processes = []
 
         for i in range(worker):
@@ -251,7 +251,7 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'china']
 
     k_x_1 = 4
-    brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'lenovo', 'hp',  'asus', 'panasonic', 'toshiba',
+    brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'hp',  'asus', 'lenovo thinkpad', 'lenovo', 'panasonic', 'toshiba',
                   'sony', 'aspire', 'dell']
     X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, parallel=False)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
