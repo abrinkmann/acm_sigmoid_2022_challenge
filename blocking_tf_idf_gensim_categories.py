@@ -70,7 +70,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace wit
     for doc_brand in docbrand2pattern2id.values():
         input_queue.put(doc_brand)
 
-    worker = 4
+    worker = 3
     processes = []
 
     for i in range(worker):
@@ -94,7 +94,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands):  # replace wit
                 new_candidate_pairs_real_ids, new_jaccard_similarities = output_queue.get()
                 candidate_pairs_real_ids.extend(new_candidate_pairs_real_ids)
                 jaccard_similarities.extend(new_jaccard_similarities)
-
+        time.sleep(0.1)
         process.join()
 
     time.sleep(0.1)
