@@ -16,7 +16,7 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
 
-def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your logic.
+def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurations):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -63,44 +63,46 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
         output_queue = Queue()
         logger.info("Encode & Embed entities...")
 
-        worker = 4
-        processes = []
+        for batch_size, configuration in itertools.product(batch_sizes, configurations):
+            start = time.time()
+            worker = configuration['worker']
+            processes = []
 
-        for i in range(worker):
-            p = Process(target=encode_and_embed, args=(input_queue, output_queue,))
-            p.start()
-            processes.append(p)
+            for i in range(worker):
+                p = Process(target=encode_and_embed, args=(input_queue, output_queue, configuration['num_threads'], ))
+                p.start()
+                processes.append(p)
 
-        embeddings = np.empty((0, 256), dtype=np.float32)
+            for examples in chunks(list(X['preprocessed'].values), batch_size):
+                input_queue.put(examples)
 
-        for examples in chunks(list(X['preprocessed'].values), 128):
-            input_queue.put(examples)
+            pbar = tqdm(total=int(len(list(X['preprocessed'].values))/batch_size))
 
-        pbar = tqdm(total=int(len(list(X['preprocessed'].values))/128))
-        while not input_queue.empty():
-            time.sleep(1)
-            while not output_queue.empty():
-                embeddings = np.append(embeddings, output_queue.get(), axis=0)
-                pbar.update(1)
-
-        input_queue.close()
-        input_queue.join_thread()
-
-
-
-        while not output_queue.empty():
-            embeddings = np.append(embeddings, output_queue.get(), axis=0)
-            pbar.update(1)
-
-        for process in processes:
-            while process.is_alive():
+            embeddings = np.empty((0, 256), dtype=np.float32)
+            while not input_queue.empty():
                 while not output_queue.empty():
                     embeddings = np.append(embeddings, output_queue.get(), axis=0)
                     pbar.update(1)
-            time.sleep(0.1)
-            process.join()
 
-        time.sleep(0.1)
+            input_queue.close()
+            input_queue.join_thread()
+
+            for process in processes:
+                while process.is_alive():
+                    while not output_queue.empty():
+                        embeddings = np.append(embeddings, output_queue.get(), axis=0)
+                        pbar.update(1)
+                process.join()
+
+            time.sleep(0.1)
+            end = time.time()
+            run_time = (end - start)
+            logger.info('Processing time: {} - Batch Size: {} - Num_Threads: {} - Worker: {}'.format(run_time,
+                                                                                                     batch_size,
+                                                                                                     configuration['num_threads'],
+                                                                                                     configuration['worker']))
+            output_queue.close()
+            output_queue.join_thread()
 
     else:
         tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased", use_fast=True)
@@ -164,10 +166,10 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
     return []
 
 
-def encode_and_embed(input_q, output_q):
+def encode_and_embed(input_q, output_q, num_threads):
     tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-    torch.set_num_threads(4)
+    torch.set_num_threads(num_threads)
 
     while not input_q.empty():
         examples = input_q.get()
@@ -240,18 +242,23 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 2
-    X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1, parallel=True)
-    if len(X1_candidate_pairs) > expected_cand_size_X1:
-        X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
+    batch_sizes = [2, 4, 8, 16, 32, 64, 128]
+    configurations = [{'num_threads': 1, 'worker': 16}, {'num_threads': 2, 'worker': 8},
+                      {'num_threads': 4, 'worker': 4}, {'num_threads': 8, 'worker': 2},
+                      {'num_threads': 16, 'worker': 1}]
 
-    #X2_candidate_pairs = []
-    stop_words_x2 = []
-    k_x_2 = 2
-    X2_candidate_pairs = block(X_2, ["name"], expected_cand_size_X1, k_x_2, parallel=True)
-    if len(X2_candidate_pairs) > expected_cand_size_X2:
-        X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
+    X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1, True, batch_sizes, configurations)
+    # if len(X1_candidate_pairs) > expected_cand_size_X1:
+    #     X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    # save results
-    save_output(X1_candidate_pairs, X2_candidate_pairs)
-    logger = logging.getLogger()
-    logger.info('Candidates saved!')
+    # #X2_candidate_pairs = []
+    # stop_words_x2 = []
+    # k_x_2 = 2
+    # X2_candidate_pairs = block(X_2, ["name"], expected_cand_size_X1, k_x_2, parallel=True)
+    # if len(X2_candidate_pairs) > expected_cand_size_X2:
+    #     X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
+    #
+    # # save results
+    # save_output(X1_candidate_pairs, X2_candidate_pairs)
+    # logger = logging.getLogger()
+    # logger.info('Candidates saved!')
