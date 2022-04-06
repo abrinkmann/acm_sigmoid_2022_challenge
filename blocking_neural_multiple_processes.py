@@ -14,9 +14,9 @@ from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
-from datasets import Dataset
 
-def block(X, attr, expected_cand_size, k_hits):  # replace with your logic.
+
+def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -53,53 +53,71 @@ def block(X, attr, expected_cand_size, k_hits):  # replace with your logic.
     #
     # candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
-    input_queue = Queue()
-    output_queue = Queue()
-    logger.info("Encode & Embed entities...")
-
     def chunks(lst, n):
         """Yield successive n-sized chunks from lst."""
         for i in tqdm(range(0, len(lst), n)):
             yield lst[i:i + n]
 
-    worker = 6
-    processes = []
+    if parallel:
+        input_queue = Queue()
+        output_queue = Queue()
+        logger.info("Encode & Embed entities...")
 
-    for i in range(worker):
-        p = Process(target=encode_and_embed, args=(input_queue, output_queue,))
-        p.start()
-        processes.append(p)
+        worker = 6
+        processes = []
 
-    embeddings = np.empty((0, 256), dtype=np.float32)
+        for i in range(worker):
+            p = Process(target=encode_and_embed, args=(input_queue, output_queue,))
+            p.start()
+            processes.append(p)
 
-    for examples in chunks(list(X['preprocessed'].values), 256):
-        input_queue.put(examples)
+        embeddings = np.empty((0, 256), dtype=np.float32)
 
-    pbar = tqdm(total=int(len(list(X['preprocessed'].values))/256))
-    while not input_queue.empty():
-        time.sleep(1)
+        for examples in chunks(list(X['preprocessed'].values), 256):
+            input_queue.put(examples)
+
+        pbar = tqdm(total=int(len(list(X['preprocessed'].values))/256))
+        while not input_queue.empty():
+            time.sleep(1)
+            while not output_queue.empty():
+                embeddings = np.append(embeddings, output_queue.get(), axis=0)
+                pbar.update(1)
+
+        input_queue.close()
+        input_queue.join_thread()
+
+
+
         while not output_queue.empty():
             embeddings = np.append(embeddings, output_queue.get(), axis=0)
             pbar.update(1)
 
-    input_queue.close()
-    input_queue.join_thread()
+        for process in processes:
+            while process.is_alive():
+                while not output_queue.empty():
+                    embeddings = np.append(embeddings, output_queue.get(), axis=0)
+                    pbar.update(1)
+            time.sleep(0.1)
+            process.join()
 
-
-
-    while not output_queue.empty():
-        embeddings = np.append(embeddings, output_queue.get(), axis=0)
-        pbar.update(1)
-
-    for process in processes:
-        while process.is_alive():
-            while not output_queue.empty():
-                embeddings = np.append(embeddings, output_queue.get(), axis=0)
-                pbar.update(1)
         time.sleep(0.1)
-        process.join()
 
-    time.sleep(0.1)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+        model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+
+        def encode_and_embed_local(examples):
+            # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
+            encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
+                                   attention_mask=torch.tensor(tokenized_output['attention_mask']),
+                                   token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+            result = encoded_output['pooler_output'].detach().numpy()
+            return result
+
+        embeddings = np.empty((0, 256), dtype=np.float32)
+        for examples in chunks(list(X['preprocessed'].values), 256):
+            embeddings = np.append(embeddings, encode_and_embed_local(examples), axis=0)
 
 
     # # To-Do: Make sure that the embeddings are normalized
@@ -219,14 +237,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 2
-    X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1)
+    X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1, parallel=True)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 2
-    X2_candidate_pairs = block(X_2, ["name"], expected_cand_size_X1, k_x_2)
+    X2_candidate_pairs = block(X_2, ["name"], expected_cand_size_X1, k_x_2, parallel=True)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
