@@ -109,10 +109,11 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
         def encode_and_embed_local(examples):
             # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
             with torch.no_grad():
-                tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
-                encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-                                       attention_mask=torch.tensor(tokenized_output['attention_mask']),
-                                       token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+                tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64,
+                                             return_tensors='pt')
+                encoded_output = model(input_ids=tokenized_output['input_ids'],
+                                       attention_mask=tokenized_output['attention_mask'],
+                                       token_type_ids=tokenized_output['token_type_ids'])
                 result = encoded_output['pooler_output'].detach().numpy()
                 return result
 
@@ -172,10 +173,10 @@ def encode_and_embed(input_q, output_q):
         examples = input_q.get()
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
         with torch.no_grad():
-            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
-            encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-                                   attention_mask=torch.tensor(tokenized_output['attention_mask']),
-                                   token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
+            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64, return_tensors='pt')
+            encoded_output = model(input_ids=tokenized_output['input_ids'],
+                                   attention_mask=tokenized_output['attention_mask'],
+                                   token_type_ids=tokenized_output['token_type_ids'])
             result = encoded_output['pooler_output'].detach().numpy()
 
             output_q.put(result)
