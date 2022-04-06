@@ -63,7 +63,7 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
         output_queue = Queue()
         logger.info("Encode & Embed entities...")
 
-        worker = 6
+        worker = 4
         processes = []
 
         for i in range(worker):
@@ -73,10 +73,10 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
 
         embeddings = np.empty((0, 256), dtype=np.float32)
 
-        for examples in chunks(list(X['preprocessed'].values), 256):
+        for examples in chunks(list(X['preprocessed'].values), 128):
             input_queue.put(examples)
 
-        pbar = tqdm(total=int(len(list(X['preprocessed'].values))/256))
+        pbar = tqdm(total=int(len(list(X['preprocessed'].values))/128))
         while not input_queue.empty():
             time.sleep(1)
             while not output_queue.empty():
@@ -103,7 +103,7 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
         time.sleep(0.1)
 
     else:
-        tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased", use_fast=True)
         model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
         def encode_and_embed_local(examples):
@@ -111,9 +111,7 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
             with torch.no_grad():
                 tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64,
                                              return_tensors='pt')
-                encoded_output = model(input_ids=tokenized_output['input_ids'],
-                                       attention_mask=tokenized_output['attention_mask'],
-                                       token_type_ids=tokenized_output['token_type_ids'])
+                encoded_output = model(**tokenized_output)
                 result = encoded_output['pooler_output'].detach().numpy()
                 return result
 
@@ -169,6 +167,8 @@ def block(X, attr, expected_cand_size, k_hits, parallel):  # replace with your l
 def encode_and_embed(input_q, output_q):
     tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+    torch.set_num_threads(4)
+
     while not input_q.empty():
         examples = input_q.get()
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
