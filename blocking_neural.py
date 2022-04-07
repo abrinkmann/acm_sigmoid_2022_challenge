@@ -86,20 +86,11 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     embeddings = np.empty((0, 256), dtype=np.float32)
     for examples in chunks(list(pattern2id_1.keys()), 256):
         embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
-    #embeddings = list(itertools.chain(*embeddings))
-    #ds = Dataset.from_dict({'corpus': list(pattern2id_1.keys())})
-    #ds_with_embeddings = ds.map(lambda examples: {'embeddings': encode(examples['corpus'])}, batched=True,
-    #                             batch_size=16, num_proc=cpu_count())
-    #ds_with_embeddings.add_faiss_index(column='embeddings')
-
-    # # Introduce batches(?)
-    #embedded_corpus = pool.map(encode_and_embed, tqdm(list(pattern2id_1.keys())))
 
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Add embeddings to faiss index')
     faiss_index = faiss.IndexFlatIP(256)
     faiss_index.add(embeddings)
-
 
     logger.info("Search products...")
     # # To-Do: Replace iteration
