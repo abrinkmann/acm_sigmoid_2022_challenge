@@ -175,13 +175,13 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
 def encode_and_embed(input_q, output_q, num_threads):
     tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-    torch.set_num_threads(num_threads)
+    #torch.set_num_threads(num_threads)
 
     while not input_q.empty():
         examples = input_q.get()
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
         with torch.no_grad():
-            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64, return_tensors='pt')
+            tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=32, return_tensors='pt')
             encoded_output = model(input_ids=tokenized_output['input_ids'],
                                    attention_mask=tokenized_output['attention_mask'],
                                    token_type_ids=tokenized_output['token_type_ids'])
@@ -248,10 +248,13 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 2
-    batch_sizes = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-    configurations = [{'num_threads': 1, 'worker': 16}, {'num_threads': 2, 'worker': 8},
-                      {'num_threads': 4, 'worker': 4}, {'num_threads': 8, 'worker': 2},
-                      {'num_threads': 16, 'worker': 1}]
+    # batch_sizes = [2, 4, 8, 16, 32, 64, 128, 256, 512]
+    # configurations = [{'num_threads': 1, 'worker': 16}, {'num_threads': 2, 'worker': 8},
+    #                   {'num_threads': 4, 'worker': 4}, {'num_threads': 8, 'worker': 2},
+    #                   {'num_threads': 16, 'worker': 1}]
+
+    batch_sizes = [256]
+    configurations = [{'num_threads': 16, 'worker': 1}]
 
     X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1, True, batch_sizes, configurations)
     # if len(X1_candidate_pairs) > expected_cand_size_X1:
