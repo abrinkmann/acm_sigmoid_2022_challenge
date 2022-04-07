@@ -253,10 +253,10 @@ if __name__ == '__main__':
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 4
-    brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
-    product_types_x_2 = ['extreme', 'plus', 'ultra']
-    #brands_x_2 = []
-    #product_types_x_2 = []
+    #brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
+    #product_types_x_2 = ['extreme', 'plus', 'ultra']
+    brands_x_2 = []
+    product_types_x_2 = []
     X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, product_types_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
