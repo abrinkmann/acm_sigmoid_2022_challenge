@@ -51,6 +51,20 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, product_types):
                 break
         docbrand2pattern2id['{}-{}'.format(doc_brand, doc_product_type)][pattern].append(X['id'][i])
 
+    logger.info('Start search')
+    # Fill input queue
+    input_queue = Queue()
+    output_queue = Queue()
+    for doc_brand in docbrand2pattern2id.values():
+        input_queue.put(doc_brand)
+
+    worker = 6
+    processes = []
+
+    for i in range(worker):
+        p = Process(target=search_tfidf_gensim, args=(input_queue, output_queue, k_hits,))
+        p.start()
+        processes.append(p)
 
     # Prepare pairs deduced from groups while waiting for search results
     logger.info('Create group candidates')
@@ -66,22 +80,6 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits, brands, product_types):
 
     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
     jaccard_similarities = [1.0] * len(candidate_pairs_real_ids)
-
-
-    logger.info('Start search')
-    # Fill input queue
-    input_queue = Queue()
-    output_queue = Queue()
-    for doc_brand in docbrand2pattern2id.values():
-        input_queue.put(doc_brand)
-
-    worker = 6
-    processes = []
-
-    for i in range(worker):
-        p = Process(target=search_tfidf_gensim, args=(input_queue, output_queue, k_hits,))
-        p.start()
-        processes.append(p)
 
     while not input_queue.empty():
         time.sleep(1)
@@ -131,9 +129,9 @@ def search_tfidf_gensim(input_queue, output_queue, k_hits):
         candidate_group_pairs = []
         tokenized_corpus = [tokenize(product) for product in doc_brand.keys()]
         dct = corpora.Dictionary(tokenized_corpus)
-        abs_max_df = 30
-        if len(tokenized_corpus) > abs_max_df: # fit dictionary
-            dct.filter_extremes(no_below=2, no_above=abs_max_df/len(tokenized_corpus))
+
+        if len(tokenized_corpus) * 0.5 > 2: # fit dictionary
+            dct.filter_extremes(no_below=2, no_above=0.8)
 
         corpus = [dct.doc2bow(product) for product in tokenized_corpus]
 
@@ -187,7 +185,7 @@ def search_tfidf_gensim(input_queue, output_queue, k_hits):
 def preprocess_input(doc):
     doc = doc.lower()
 
-    stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
+    stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
     regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
 
@@ -244,8 +242,9 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'china']
 
     k_x_1 = 4
-    brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'hp',  'asus', 'lenovo thinkpad', 'lenovo', 'panasonic', 'toshiba',
-                  'sony', 'aspire', 'dell']
+    #brands_x_1 = ['vaio', 'samsung', 'fujitsu', 'hp',  'asus', 'lenovo thinkpad', 'lenovo', 'panasonic', 'toshiba',
+    #              'sony', 'aspire', 'dell']
+    brands_x_1 = []
     product_types_x_1 = []
     X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, k_x_1, brands_x_1, product_types_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
@@ -256,6 +255,8 @@ if __name__ == '__main__':
     k_x_2 = 4
     brands_x_2 = ['lexar', 'kingston', 'samsung', 'sony', 'toshiba', 'sandisk', 'intenso', 'transcend']
     product_types_x_2 = ['extreme', 'plus', 'ultra']
+    #brands_x_2 = []
+    #product_types_x_2 = []
     X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, k_x_2, brands_x_2, product_types_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
