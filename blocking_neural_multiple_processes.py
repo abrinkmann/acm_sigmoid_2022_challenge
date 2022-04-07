@@ -253,8 +253,8 @@ if __name__ == '__main__':
     #                   {'num_threads': 4, 'worker': 4}, {'num_threads': 8, 'worker': 2},
     #                   {'num_threads': 16, 'worker': 1}]
 
-    batch_sizes = [256]
-    configurations = [{'num_threads': 16, 'worker': 1}]
+    batch_sizes = [128]
+    configurations = [{'num_threads': 4, 'worker': 4}]
 
     X1_candidate_pairs = block(X_1, ["title"], expected_cand_size_X1, k_x_1, True, batch_sizes, configurations)
     # if len(X1_candidate_pairs) > expected_cand_size_X1:
