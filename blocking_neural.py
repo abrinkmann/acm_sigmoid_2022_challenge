@@ -15,6 +15,8 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 from datasets import Dataset
 
+tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+
 def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your logic.
     '''
     This function performs blocking using elastic search
@@ -34,13 +36,9 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
 
     pattern2id_1 = defaultdict(list)
     logger.info("Group products...")
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-    length_count = 0
+
     for i in tqdm(range(X.shape[0])):
-        tokens = tokenizer.tokenize(X['preprocessed'][i])
-        pattern = tokenizer.convert_tokens_to_string(tokens[:16])
-        length_count += len(pattern)
-        pattern2id_1[pattern].append(X['id'][i])
+        pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
     goup_ids = [i for i in range(len(pattern2id_1))]
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
@@ -81,10 +79,11 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
             yield lst[i:i + n]
 
     # To-Do: Change embedding to list --> finally concatenate
-    embeddings = np.empty((0, 256), dtype=np.float32)
+    embeddings = []
     for examples in chunks(list(pattern2id_1.keys()), 256):
-        embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
+        embeddings.append(encode_and_embed(examples))
 
+    embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Add embeddings to faiss index')
     faiss_index = faiss.IndexFlatIP(256)
@@ -144,7 +143,10 @@ def preprocess_input(doc):
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
 
-    return doc
+    tokens = tokenizer.tokenize(doc)
+    pattern = tokenizer.convert_tokens_to_string(tokens[:16])
+
+    return pattern
 
 def save_output(X1_candidate_pairs,
                 X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
