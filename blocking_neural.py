@@ -25,6 +25,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     logger = logging.getLogger()
 
     logger.info("Preprocessing products...")
+
     worker = cpu_count()
     pool = Pool(worker)
     X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
@@ -33,8 +34,13 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
 
     pattern2id_1 = defaultdict(list)
     logger.info("Group products...")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+    length_count = 0
     for i in tqdm(range(X.shape[0])):
-        pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
+        tokens = tokenizer.tokenize(X['preprocessed'][i])
+        pattern = tokenizer.convert_tokens_to_string(tokens[:16])
+        length_count += len(pattern)
+        pattern2id_1[pattern].append(X['id'][i])
 
     goup_ids = [i for i in range(len(pattern2id_1))]
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
@@ -54,21 +60,12 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
 
     logger.info("Load models...")
 
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-    model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
-    # def encode(examples):
-    #     # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-    #     tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
-    #     #encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-    #     #                       attention_mask=torch.tensor(tokenized_output['attention_mask']),
-    #     #                       token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
-    #     #result = encoded_output['pooler_output'].detach().numpy()
-    #     return tokenized_output['input_ids']
+    model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
     def encode_and_embed(examples):
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-        tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=64)
+        tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=16)
         encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
                                attention_mask=torch.tensor(tokenized_output['attention_mask']),
                                token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
@@ -83,6 +80,7 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
         for i in tqdm(range(0, len(lst), n)):
             yield lst[i:i + n]
 
+    # To-Do: Change embedding to list --> finally concatenate
     embeddings = np.empty((0, 256), dtype=np.float32)
     for examples in chunks(list(pattern2id_1.keys()), 256):
         embeddings = np.append(embeddings, encode_and_embed(examples), axis=0)
@@ -92,63 +90,49 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     faiss_index = faiss.IndexFlatIP(256)
     faiss_index.add(embeddings)
 
-    logger.info("Search products...")
-    # # To-Do: Replace iteration
-    candidate_group_pairs = []
-    for index in tqdm(range(len(embeddings))):
-        embedding = np.array([embeddings[index]])
-        D, I = faiss_index.search(embedding, k_hits)
-        for distance, top_id in zip(D[0], I[0]):
-            if index == top_id:
-                continue
-            elif index < top_id:
-                candidate_group_pair = (index, top_id)
-            else:
-                candidate_group_pair = (top_id, index)
-
-            candidate_group_pairs.append(candidate_group_pair)
-
-    candidate_group_pairs = list(set(candidate_group_pairs))
-    if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
-        candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
-
-    logger.info('GroupIds to real ids')
-    for pair in tqdm(candidate_group_pairs):
-        real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
-        real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
-
-        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
-            if real_id1 < real_id2:
-                candidate_pair = (real_id1, real_id2)
-            elif real_id1 > real_id2:
-                candidate_pair = (real_id2, real_id1)
-            else:
-                continue
-            candidate_pairs_real_ids.append(candidate_pair)
+    # logger.info("Search products...")
+    # # # To-Do: Replace iteration
+    # candidate_group_pairs = []
+    # for index in tqdm(range(len(embeddings))):
+    #     embedding = np.array([embeddings[index]])
+    #     D, I = faiss_index.search(embedding, k_hits)
+    #     for distance, top_id in zip(D[0], I[0]):
+    #         if index == top_id:
+    #             continue
+    #         elif index < top_id:
+    #             candidate_group_pair = (index, top_id)
+    #         else:
+    #             candidate_group_pair = (top_id, index)
+    #
+    #         candidate_group_pairs.append(candidate_group_pair)
+    #
+    # candidate_group_pairs = list(set(candidate_group_pairs))
+    # if len(candidate_group_pairs) > (expected_cand_size - len(candidate_pairs_real_ids) + 1):
+    #     candidate_group_pairs = candidate_group_pairs[:(expected_cand_size - len(candidate_pairs_real_ids) + 1)]
+    #
+    # logger.info('GroupIds to real ids')
+    # for pair in tqdm(candidate_group_pairs):
+    #     real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
+    #     real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
+    #
+    #     for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+    #         if real_id1 < real_id2:
+    #             candidate_pair = (real_id1, real_id2)
+    #         elif real_id1 > real_id2:
+    #             candidate_pair = (real_id2, real_id1)
+    #         else:
+    #             continue
+    #         candidate_pairs_real_ids.append(candidate_pair)
 
     return candidate_pairs_real_ids
-
-def parallel_processing(X, func):
-    worker = cpu_count()
-    pool = Pool(worker)
-    X_split = np.array_split(X, worker)
-    X_split = pool.map(func, tqdm(X_split))
-    pool.close()
-    pool.join()
-
-    return pd.concat(X_split)
-
-
-def preprocess_dataframe(X):
-    return X.apply(preprocess_input, axis=1)
-
 
 def preprocess_input(doc):
     doc = doc[0].lower()
 
     stop_words = ['ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    regex_list = ['^dell*', '[\d\w]*\.com', '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
+                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+    regex_list = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de',
+                  '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
 
     for stop_word in stop_words:
         doc = doc.replace(stop_word, ' ')
@@ -160,8 +144,7 @@ def preprocess_input(doc):
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
 
-    return doc[:64]
-
+    return doc
 
 def save_output(X1_candidate_pairs,
                 X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
