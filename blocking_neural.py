@@ -1,5 +1,4 @@
 
-import itertools
 import logging
 import re
 from collections import defaultdict
@@ -13,11 +12,10 @@ from psutil import cpu_count
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
-from datasets import Dataset
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
-def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your logic.
+def block_with_bm25(X, attr, k_hits):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -40,11 +38,13 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
-    goup_ids = [i for i in range(len(pattern2id_1))]
-    group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
+
 
     # Prepare pairs deduced from groups while waiting for search results
+    # To-DO: Parallel processing of group candidate creation & model loading
     logger.info('Create group candidates')
+    goup_ids = [i for i in range(len(pattern2id_1))]
+    group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
     # Add candidates from grouping
     candidate_pairs_real_ids = []
 
@@ -187,14 +187,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 2
-    X1_candidate_pairs = block_with_bm25(X_1, ["title"], expected_cand_size_X1, k_x_1)
+    X1_candidate_pairs = block_with_bm25(X_1, ["title"], k_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 2
-    X2_candidate_pairs = block_with_bm25(X_2, ["name"], expected_cand_size_X1, k_x_2)
+    X2_candidate_pairs = block_with_bm25(X_2, ["name"], k_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
