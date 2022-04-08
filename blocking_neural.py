@@ -16,7 +16,7 @@ from transformers import AutoTokenizer, AutoModel
 tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 
-def block_with_bm25(X, attr, k_hits):  # replace with your logic.
+def block_neural(X, attr, k_hits):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -91,10 +91,11 @@ def block_with_bm25(X, attr, k_hits):  # replace with your logic.
     logger.info("Search products...")
     # # To-Do: Replace iteration
     candidate_group_pairs = []
-    for index in tqdm(range(len(embeddings))):
-        embedding = np.array([embeddings[index]])
-        D, I = faiss_index.search(embedding, k_hits)
-        for distance, top_id in zip(D[0], I[0]):
+    # for index in tqdm(range(len(embeddings))):
+    #     embedding = np.array([embeddings[index]])
+    D, I = faiss_index.search(embeddings, k_hits)
+    for index in range(len(I)):
+        for distance, top_id in zip(D[index], I[index]):
             if index == top_id:
                 continue
             elif index < top_id:
@@ -183,14 +184,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_with_bm25(X_1, ["title"], k_x_1)
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_with_bm25(X_2, ["name"], k_x_2)
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
