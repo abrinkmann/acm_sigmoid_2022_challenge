@@ -58,17 +58,18 @@ def block_with_bm25(X, attr, expected_cand_size, k_hits):  # replace with your l
 
     logger.info("Load models...")
 
-
     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+    model.eval()
 
     def encode_and_embed(examples):
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-        tokenized_output = tokenizer(examples, padding=True, truncation=True, max_length=16)
-        encoded_output = model(input_ids=torch.tensor(tokenized_output['input_ids']),
-                               attention_mask=torch.tensor(tokenized_output['attention_mask']),
-                               token_type_ids=torch.tensor(tokenized_output['token_type_ids']))
-        result = encoded_output['pooler_output'].detach().numpy()
-        return result
+        with torch.no_grad():
+            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16)
+            encoded_output = model(input_ids=torch.tensor(tokenized_input['input_ids']),
+                                   attention_mask=torch.tensor(tokenized_input['attention_mask']),
+                                   token_type_ids=torch.tensor(tokenized_input['token_type_ids']))
+            result = encoded_output['pooler_output'].detach().numpy()
+            return result
 
 
     logger.info("Encode & Embed entities...")
