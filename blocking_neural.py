@@ -88,7 +88,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     # To-Do: Change embedding to list --> finally concatenate
     embeddings = []
-    for examples in chunks(list(pattern2id_1.keys()), 512):
+    for examples in chunks(list(pattern2id_1.keys()), 256):
         embeddings.append(encode_and_embed(examples))
 
     embeddings = np.concatenate(embeddings)
@@ -224,14 +224,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
