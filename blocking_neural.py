@@ -15,10 +15,10 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-#special_tokens_dict = {'additional_special_tokens': ['lenovo','thinkpad','elitebook']}
-#num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+special_tokens_dict = {'additional_special_tokens': ['lenovo','thinkpad','elitebook', 'toshiba', 'asus', 'acer', 'lexar', 'sandisk', 'tesco', 'intenso', 'transcend']}
+num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
 model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-#model.resize_token_embeddings(len(tokenizer))
+model.resize_token_embeddings(len(tokenizer))
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -96,7 +96,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     logger.info('Initialize faiss index')
     d = 256
     m = 32
-    nlist = int(4*math.sqrt(len(embeddings)))
+    nlist = int(8*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
@@ -150,16 +150,29 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 def preprocess_input(doc):
     doc = doc[0].lower()
 
-    stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap',
-                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
-    regex_list = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de',
-                  '\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
+    stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
+                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '']
+    regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de', '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
+
+    regex_list_2 = ['\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
 
     for stop_word in stop_words:
-        doc = doc.replace(stop_word, ' ')
+        doc = doc.replace(stop_word, '')
 
-    for regex in regex_list:
-        doc = re.sub(regex, ' ', doc)
+    for regex in regex_list_1:
+        doc = re.sub(regex, '', doc)
+
+    # Move GB pattern to beginning of doc
+    gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
+
+    if len(gb_pattern) > 0:
+        gb_pattern.sort()
+        for pattern in gb_pattern:
+            doc = doc.replace(pattern, '')
+        doc = '{} {}'.format(gb_pattern[0].replace(' ', ''), doc) # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+
+    for regex in regex_list_2:
+        doc = re.sub(regex, '', doc)
 
     doc = re.sub('\s\s+', ' ', doc)
     doc = re.sub('\s*$', '', doc)
@@ -211,14 +224,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
