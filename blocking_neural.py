@@ -99,7 +99,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     nlist = int(16*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
-    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 16) # 8 specifies that each sub-vector is encoded as 8 bits
+    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
