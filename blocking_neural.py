@@ -84,16 +84,28 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
 
     embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
+    logger.info('Initialize faiss index')
+    d = 256
+    nlist = 100
+    quantizer = faiss.IndexFlatIP(d)
+    faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+
+    assert not faiss_index.is_trained
+    logger.info('Train Faiss Index')
+    faiss_index.train(embeddings)
+    assert faiss_index.is_trained
     logger.info('Add embeddings to faiss index')
-    faiss_index = faiss.IndexFlatIP(256)
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    # # To-Do: Replace iteration
     candidate_group_pairs = []
+    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
+
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
+
     D, I = faiss_index.search(embeddings, k_hits)
+    logger.info('Collect search results')
     for index in range(len(I)):
         for distance, top_id in zip(D[index], I[index]):
             if index == top_id:
