@@ -1,5 +1,6 @@
 import itertools
 import logging
+import math
 import re
 from collections import defaultdict
 from multiprocessing import Pool
@@ -95,7 +96,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     logger.info('Initialize faiss index')
     d = 256
     m = 64
-    nlist = 4000
+    nlist = int(4*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
