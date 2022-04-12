@@ -88,7 +88,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     # To-Do: Change embedding to list --> finally concatenate
     embeddings = []
-    for examples in chunks(list(pattern2id_1.keys()), 256):
+    for examples in chunks(list(pattern2id_1.keys()), 512):
         embeddings.append(encode_and_embed(examples))
 
     embeddings = np.concatenate(embeddings)
