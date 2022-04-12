@@ -14,9 +14,12 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+#special_tokens_dict = {'additional_special_tokens': ['lenovo','thinkpad','elitebook']}
+#num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
 model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+#model.resize_token_embeddings(len(tokenizer))
 
-def block_neural(X, attr, k_hits):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -30,6 +33,11 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
     worker = cpu_count()
     pool = Pool(worker)
     X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
+
+    if path_to_preprocessed_file is not None:
+        X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
+        X.to_csv(path_to_preprocessed_file)
+
     pool.close()
     pool.join()
 
@@ -101,7 +109,7 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 5     # the number of cells (out of nlist) that are visited to perform a search
 
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
@@ -113,9 +121,9 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
             if index == top_id:
                 continue
             elif index < top_id:
-                candidate_group_pair = (index, top_id)
+                candidate_group_pair = (index, top_id, distance)
             else:
-                candidate_group_pair = (top_id, index)
+                candidate_group_pair = (top_id, index, distance)
 
             candidate_group_pairs.append(candidate_group_pair)
 
@@ -160,6 +168,9 @@ def preprocess_input(doc):
 
     return pattern
 
+def tokenize_input(doc):
+    return tokenizer.tokenize(doc)
+
 def save_output(X1_candidate_pairs,
                 X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
     expected_cand_size_X1 = 1000000
@@ -198,14 +209,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1)
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2)
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
