@@ -95,7 +95,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
     d = 256
-    m = 64
+    m = 32
     nlist = int(4*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
@@ -110,7 +110,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 1     # the number of cells (out of nlist) that are visited to perform a search
 
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
