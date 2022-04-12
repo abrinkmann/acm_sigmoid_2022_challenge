@@ -95,10 +95,10 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     logger.info('Initialize faiss index')
     d = 256
     m = 64
-    nlist = 100
+    nlist = 1000
     quantizer = faiss.IndexFlatIP(d)
-    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
-    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
+    faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    #faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
@@ -109,7 +109,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 5     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
 
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
@@ -209,14 +209,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
