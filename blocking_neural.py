@@ -86,9 +86,11 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
     d = 256
+    m = 64
     nlist = 100
     quantizer = faiss.IndexFlatIP(d)
-    faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
@@ -106,7 +108,7 @@ def block_neural(X, attr, k_hits):  # replace with your logic.
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
-    for index in range(len(I)):
+    for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if index == top_id:
                 continue
