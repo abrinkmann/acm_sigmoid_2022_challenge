@@ -110,7 +110,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 1     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 5     # the number of cells (out of nlist) that are visited to perform a search
 
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
@@ -119,14 +119,15 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     logger.info('Collect search results')
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
-            if index == top_id:
-                continue
-            elif index < top_id:
-                candidate_group_pair = (index, top_id, distance)
-            else:
-                candidate_group_pair = (top_id, index, distance)
+            if top_id > 0:
+                if index == top_id:
+                    continue
+                elif index < top_id:
+                    candidate_group_pair = (index, top_id, distance)
+                else:
+                    candidate_group_pair = (top_id, index, distance)
 
-            candidate_group_pairs.append(candidate_group_pair)
+                candidate_group_pairs.append(candidate_group_pair)
 
     candidate_group_pairs = list(set(candidate_group_pairs))
 
