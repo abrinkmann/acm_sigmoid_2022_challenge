@@ -1,27 +1,26 @@
+import csv
 import itertools
 import logging
 import math
 import re
+import time
 from collections import defaultdict
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue, Process
 
 import faiss
 import torch
 
 import numpy as np
 from psutil import cpu_count
+from sentence_transformers import models, SentenceTransformer
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-special_tokens_dict = {'additional_special_tokens': ['lenovo','thinkpad','elitebook', 'toshiba', 'asus', 'acer', 'lexar', 'sandisk', 'tesco', 'intenso', 'transcend']}
-num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
-model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-model.resize_token_embeddings(len(tokenizer))
-
-ff_layer = nn.Linear(256, 64, bias=False)
+tokenizer = AutoTokenizer.from_pretrained("sbert_xtremedistil-l6-h256-uncased_mean_cosine")
+model = SentenceTransformer(model_name_or_path="sbert_xtremedistil-l6-h256-uncased_mean_cosine")
+#word_embedding_model = models.Transformer("sbert_xtremedistil-l6-h256-uncased_mean_cosine")
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -40,7 +39,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     if path_to_preprocessed_file is not None:
         X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
-        X.to_csv(path_to_preprocessed_file)
+        X.to_csv(path_to_preprocessed_file, sep=',', encoding='utf-8', index=False, quoting=csv.QUOTE_MINIMAL)
 
     pool.close()
     pool.join()
@@ -83,9 +82,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
             encoded_output = model(input_ids=tokenized_input['input_ids'],
                                    attention_mask=tokenized_input['attention_mask'],
                                    token_type_ids=tokenized_input['token_type_ids'])
-            result = mean_pooling(encoded_output, tokenized_input['attention_mask'])
-            result = ff_layer(result)
-            return result
+            return encoded_output
 
 
     logger.info("Encode & Embed entities...")
@@ -95,12 +92,50 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         for i in tqdm(range(0, len(lst), n)):
             yield lst[i:i + n]
 
-    # To-Do: Change embedding to list --> finally concatenate
     embeddings = []
-    for examples in chunks(list(pattern2id_1.keys()), 256):
-        embeddings.append(encode_and_embed(examples))
+    parallel = False
+    if parallel:
+        input_queue = Queue()
+        output_queue = Queue()
 
-    embeddings = np.concatenate(embeddings)
+        processes = []
+
+        for i in range(2):
+            p = Process(target=encode_and_embed, args=(input_queue, output_queue, 8,))
+            p.start()
+            processes.append(p)
+
+        for examples in chunks(list(pattern2id_1.keys()), 256):
+            input_queue.put(examples)
+
+        pbar = tqdm(total=int(len(list(pattern2id_1.keys())) / 256))
+
+        embeddings = []
+        while not input_queue.empty():
+            while not output_queue.empty():
+                embeddings.append(output_queue.get())
+                pbar.update(1)
+
+        input_queue.close()
+        input_queue.join_thread()
+
+        for process in processes:
+            while process.is_alive():
+                while not output_queue.empty():
+                    embeddings.append(output_queue.get())
+                    pbar.update(1)
+            process.join()
+
+        time.sleep(0.1)
+
+    else:
+        # To-Do: Change embedding to list --> finally concatenate
+        embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
+                                  normalize_embeddings=True)
+        #for examples in chunks(list(pattern2id_1.keys()), 256):
+        #    embeddings.append(encode_and_embed(examples))
+
+    #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
     d = 64
@@ -156,11 +191,37 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     return candidate_pairs_real_ids
 
+# def encode_and_embed_parallel(input_q, output_q, num_threads):
+#     tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+#     special_tokens_dict = {
+#         'additional_special_tokens': ['lenovo', 'thinkpad', 'elitebook', 'toshiba', 'asus', 'acer', 'lexar', 'sandisk',
+#                                       'tesco', 'intenso', 'transcend']}
+#     num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+#     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
+#     model.resize_token_embeddings(len(tokenizer))
+#
+#     ff_layer = nn.Linear(256, 64, bias=False)
+#
+#     torch.set_num_threads(num_threads)
+#
+#     while not input_q.empty():
+#         examples = input_q.get()
+#         with torch.no_grad():
+#             tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='pt')
+#             encoded_output = model(input_ids=tokenized_input['input_ids'],
+#                                    attention_mask=tokenized_input['attention_mask'],
+#                                    token_type_ids=tokenized_input['token_type_ids'])
+#             #result = mean_pooling(encoded_output, tokenized_input['attention_mask'])
+#             #result = ff_layer(result)
+#
+#         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+#         output_q.put(result)
+
 def preprocess_input(doc):
     doc = doc[0].lower()
 
     stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
-                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '']
+                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';']
     regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de', '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
 
     regex_list_2 = ['\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
@@ -233,14 +294,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
