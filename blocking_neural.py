@@ -10,6 +10,7 @@ import torch
 
 import numpy as np
 from psutil import cpu_count
+from torch import nn
 from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
@@ -19,6 +20,8 @@ special_tokens_dict = {'additional_special_tokens': ['lenovo','thinkpad','eliteb
 num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
 model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
 model.resize_token_embeddings(len(tokenizer))
+
+ff_layer = nn.Linear(256, 64, bias=False)
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -68,14 +71,20 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Load models...")
 
+    def mean_pooling(model_output, attention_mask):
+        token_embeddings = model_output[0]  # First element of model_output contains all token embeddings
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
     def encode_and_embed(examples):
         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
         with torch.no_grad():
-            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16)
-            encoded_output = model(input_ids=torch.tensor(tokenized_input['input_ids']),
-                                   attention_mask=torch.tensor(tokenized_input['attention_mask']),
-                                   token_type_ids=torch.tensor(tokenized_input['token_type_ids']))
-            result = encoded_output['pooler_output'].detach().numpy()
+            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='pt')
+            encoded_output = model(input_ids=tokenized_input['input_ids'],
+                                   attention_mask=tokenized_input['attention_mask'],
+                                   token_type_ids=tokenized_input['token_type_ids'])
+            result = mean_pooling(encoded_output, tokenized_input['attention_mask'])
+            result = ff_layer(result)
             return result
 
 
@@ -94,8 +103,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
-    d = 256
-    m = 32
+    d = 64
+    m = 8
     nlist = int(16*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
