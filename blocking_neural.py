@@ -19,8 +19,8 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/acm_challenge', use_auth_token=True)
-model = SentenceTransformer(model_name_or_path='ABrinkmann/acm_challenge', use_auth_token=True)
+tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+model = SentenceTransformer('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -74,7 +74,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
-    d = 64
+    d = 32
     ### m = 8
     nlist = int(20*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
