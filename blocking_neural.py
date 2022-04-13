@@ -19,8 +19,8 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/acm_challenge', use_auth_token=HfFolder.get_token())
-model = SentenceTransformer(model_name_or_path='ABrinkmann/acm_challenge', use_auth_token=HfFolder.get_token())
+tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/acm_challenge', use_auth_token=True)
+model = SentenceTransformer(model_name_or_path='ABrinkmann/acm_challenge', use_auth_token=True)
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
