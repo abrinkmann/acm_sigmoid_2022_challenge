@@ -50,8 +50,6 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
-
-
     # Prepare pairs deduced from groups while waiting for search results
     # To-DO: Parallel processing of group candidate creation & model loading
     logger.info('Create group candidates')
@@ -68,72 +66,10 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
 
-    logger.info("Load models...")
-
-    def mean_pooling(model_output, attention_mask):
-        token_embeddings = model_output[0]  # First element of model_output contains all token embeddings
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-
-    def encode_and_embed(examples):
-        # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-        with torch.no_grad():
-            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='pt')
-            encoded_output = model(input_ids=tokenized_input['input_ids'],
-                                   attention_mask=tokenized_input['attention_mask'],
-                                   token_type_ids=tokenized_input['token_type_ids'])
-            return encoded_output
-
-
     logger.info("Encode & Embed entities...")
 
-    def chunks(lst, n):
-        """Yield successive n-sized chunks from lst."""
-        for i in tqdm(range(0, len(lst), n)):
-            yield lst[i:i + n]
-
-    embeddings = []
-    parallel = False
-    if parallel:
-        input_queue = Queue()
-        output_queue = Queue()
-
-        processes = []
-
-        for i in range(2):
-            p = Process(target=encode_and_embed, args=(input_queue, output_queue, 8,))
-            p.start()
-            processes.append(p)
-
-        for examples in chunks(list(pattern2id_1.keys()), 256):
-            input_queue.put(examples)
-
-        pbar = tqdm(total=int(len(list(pattern2id_1.keys())) / 256))
-
-        embeddings = []
-        while not input_queue.empty():
-            while not output_queue.empty():
-                embeddings.append(output_queue.get())
-                pbar.update(1)
-
-        input_queue.close()
-        input_queue.join_thread()
-
-        for process in processes:
-            while process.is_alive():
-                while not output_queue.empty():
-                    embeddings.append(output_queue.get())
-                    pbar.update(1)
-            process.join()
-
-        time.sleep(0.1)
-
-    else:
-        # To-Do: Change embedding to list --> finally concatenate
-        embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                                  normalize_embeddings=True)
-        #for examples in chunks(list(pattern2id_1.keys()), 256):
-        #    embeddings.append(encode_and_embed(examples))
+    embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
+                              normalize_embeddings=True)
 
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
@@ -142,8 +78,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     m = 8
     nlist = int(16*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
-    faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
-    #faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
+    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
@@ -217,6 +153,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 #         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
 #         output_q.put(result)
 
+
 def preprocess_input(doc):
     doc = doc[0].lower()
 
@@ -253,8 +190,10 @@ def preprocess_input(doc):
 
     return pattern
 
+
 def tokenize_input(doc):
     return tokenizer.tokenize(doc)
+
 
 def save_output(X1_candidate_pairs,
                 X2_candidate_pairs):  # save the candset for both datasets to a SINGLE file output.csv
@@ -294,14 +233,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 3
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv')
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 3
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv')
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
