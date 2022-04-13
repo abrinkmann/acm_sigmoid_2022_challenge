@@ -11,6 +11,7 @@ import faiss
 import torch
 
 import numpy as np
+from huggingface_hub import HfFolder
 from psutil import cpu_count
 from sentence_transformers import models, SentenceTransformer
 from torch import nn
@@ -18,9 +19,8 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained("sbert_xtremedistil-l6-h256-uncased_mean_cosine")
-model = SentenceTransformer(model_name_or_path="sbert_xtremedistil-l6-h256-uncased_mean_cosine")
-#word_embedding_model = models.Transformer("sbert_xtremedistil-l6-h256-uncased_mean_cosine")
+tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/acm_challenge', use_auth_token=HfFolder.get_token())
+model = SentenceTransformer(model_name_or_path='ABrinkmann/acm_challenge', use_auth_token=HfFolder.get_token())
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''

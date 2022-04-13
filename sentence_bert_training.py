@@ -30,7 +30,7 @@ def sbert_finetuning(model_name, pooling, loss, num_epochs):
                                    pooling_mode_max_tokens=False
                                    )
 
-    # Dense Layer to project output to lower dimensions
+    # Dense Layer to project output to lower dimensions - To-do: Reduce out_features (?)
     dense_model = models.Dense(in_features=pooling_model.get_sentence_embedding_dimension(), out_features=64,
                                activation_function=nn.Tanh())
 
@@ -75,6 +75,7 @@ def sbert_finetuning(model_name, pooling, loss, num_epochs):
               evaluation_steps=1000,
               warmup_steps=warmup_steps,
               output_path=model_save_path)
+
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
