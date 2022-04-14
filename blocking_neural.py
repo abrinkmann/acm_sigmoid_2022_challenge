@@ -11,12 +11,7 @@ from multiprocessing import Pool, Queue, Process
 import faiss
 import torch
 
-import numpy as np
-from huggingface_hub import HfFolder
 from onnxruntime import InferenceSession
-from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
-from txtai.pipeline import HFOnnx
-
 from psutil import cpu_count
 from sentence_transformers import models, SentenceTransformer
 from torch import nn
@@ -75,10 +70,13 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     onnx_run = True
     if onnx_run:
+        # session = InferenceSession("embeddings.onnx")
+        #
+        # tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
+        # embeddings = session.run(None, dict(tokens))[0]
+        
         session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
-
-        tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
-
+        tokens = tokenizer(["I am happy", "I am glad"], return_tensors="np")
         embeddings = session.run(None, dict(tokens))[0]
 
     else:
