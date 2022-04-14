@@ -75,14 +75,22 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         #
         # tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
         # embeddings = session.run(None, dict(tokens))[0]
+        chunk_size = 256
+        def chunks(lst, n):
+            """Yield successive n-sized chunks from lst."""
+            for i in tqdm(range(0, len(lst), n)):
+                yield lst[i:i + n]
+        embeddings = []
         session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
-        inputs = tokenizer(list(pattern2id_1.keys()), return_tensors="np", padding=True, truncation=True, max_length=16)
-        inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
-        embeddings = session.run(None, dict(inputs))[0]
+        for chunk in chunks(list(pattern2id_1.keys()), chunk_size):
+            inputs = tokenizer(chunk, return_tensors="np", padding=True, truncation=True, max_length=16)
+            inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
+            embeddings.append(session.run(None, dict(inputs))[0])
+
+        embeddings = np.concatenate(embeddings, axis=0)
     else:
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
                                    normalize_embeddings=True)
-
 
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
