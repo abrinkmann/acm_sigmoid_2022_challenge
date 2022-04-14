@@ -77,7 +77,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         # embeddings = session.run(None, dict(tokens))[0]
         session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
         inputs = tokenizer(list(pattern2id_1.keys()), return_tensors="np", padding=True, truncation=True, max_length=16)
-        embeddings = session.run(None, inputs)[0]
+        inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
+        embeddings = session.run(None, dict(inputs))[0]
     else:
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
                                    normalize_embeddings=True)
