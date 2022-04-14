@@ -9,6 +9,7 @@ from collections import defaultdict
 from multiprocessing import Pool, Queue, Process
 
 import faiss
+import numpy as np
 import torch
 
 from onnxruntime import InferenceSession
@@ -74,11 +75,9 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         #
         # tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
         # embeddings = session.run(None, dict(tokens))[0]
-        
         session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
-        tokens = tokenizer(["I am happy", "I am glad"], return_tensors="np")
-        embeddings = session.run(None, dict(tokens))[0]
-
+        inputs = tokenizer(list(pattern2id_1.keys()), return_tensors="np", padding=True, truncation=True, max_length=16)
+        embeddings = session.run(None, inputs)[0]
     else:
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
                                    normalize_embeddings=True)
