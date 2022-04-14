@@ -70,37 +70,50 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     logger.info("Encode & Embed entities...")
 
     onnx_run = True
+
     if onnx_run:
-        # session = InferenceSession("embeddings.onnx")
-        #
-        # tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
-        # embeddings = session.run(None, dict(tokens))[0]
-        chunk_size = 256
+        import onnxruntime
+
+        #sess_options = onnxruntime.SessionOptions()
+        #sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+        ort_session = onnxruntime.InferenceSession("xtremedistil-l6-h256-uncased.onnx")
+
+        def encode_and_embed(examples):
+            # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='np')
+            dict_tokenized_input = dict(tokenized_input)
+            del dict_tokenized_input['token_type_ids']
+            # Hack to run on Windows
+            dict_tokenized_input = {k: v.astype(np.int64) for k,v in dict_tokenized_input.items()}
+            ort_outs = ort_session.run(None, dict_tokenized_input)
+            result = ort_outs[1]
+
+            return result
+
         def chunks(lst, n):
             """Yield successive n-sized chunks from lst."""
             for i in tqdm(range(0, len(lst), n)):
                 yield lst[i:i + n]
-        embeddings = []
-        session = InferenceSession("xtremedistil-l6-h256-uncased.opt.onnx", providers=['CPUExecutionProvider'])
-        for chunk in chunks(list(pattern2id_1.keys()), chunk_size):
-            inputs = tokenizer(chunk, return_tensors="np", padding=True, truncation=True, max_length=16)
-            inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
-            embeddings.append(session.run(None, dict(inputs))[0])
 
+        embeddings = []
+        for examples in chunks(list(pattern2id_1.keys()), 256):
+            embeddings.append(encode_and_embed(examples))
         embeddings = np.concatenate(embeddings, axis=0)
+
     else:
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                                   normalize_embeddings=True)
+                               normalize_embeddings=True)
 
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
-    d = 256
-    ### m = 8
+    d = 32
+    m = 8
     nlist = int(20*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
-    faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
-    #faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
+    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
