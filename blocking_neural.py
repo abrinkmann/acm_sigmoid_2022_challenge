@@ -81,7 +81,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
             for i in tqdm(range(0, len(lst), n)):
                 yield lst[i:i + n]
         embeddings = []
-        session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
+        session = InferenceSession("xtremedistil-l6-h256-uncased.opt.onnx", providers=['CPUExecutionProvider'])
         for chunk in chunks(list(pattern2id_1.keys()), chunk_size):
             inputs = tokenizer(chunk, return_tensors="np", padding=True, truncation=True, max_length=16)
             inputs = {k: v.astype(np.int64) for k, v in inputs.items()}
