@@ -73,11 +73,11 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Encode & Embed entities...")
 
-    onnx_run = False
+    onnx_run = True
     if onnx_run:
         session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
 
-        tokens = tokenizer(["I am happy", "I am glad"], return_tensors="np")
+        tokens = tokenizer(list(pattern2id_1.keys()), return_tensors="np")
 
         embeddings = session.run(None, dict(tokens))[0]
 
@@ -89,7 +89,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
-    d = 32
+    d = 256
     ### m = 8
     nlist = int(20*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
