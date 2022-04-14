@@ -4,9 +4,9 @@ from tqdm import tqdm
 from utils import collect_pairs_from_file
 
 print('Load pairs')
-output_pairs = collect_pairs_from_file('output.csv')
-y1_pairs = collect_pairs_from_file('Y1.csv')
-y2_pairs = collect_pairs_from_file('Y2.csv')
+output_pairs = collect_pairs_from_file('../output.csv')
+y1_pairs = collect_pairs_from_file('../Y1.csv')
+y2_pairs = collect_pairs_from_file('../Y2.csv')
 
 # Remove 0,0 pairs from output_pairs
 output_pairs = [output_pair for output_pair in output_pairs if output_pair != '0-0']

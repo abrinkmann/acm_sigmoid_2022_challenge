@@ -2,6 +2,7 @@ import csv
 import itertools
 import logging
 import math
+import os
 import re
 import time
 from collections import defaultdict
@@ -12,6 +13,10 @@ import torch
 
 import numpy as np
 from huggingface_hub import HfFolder
+from onnxruntime import InferenceSession
+from onnxruntime.capi.onnxruntime_pybind11_state import SessionOptions
+from txtai.pipeline import HFOnnx
+
 from psutil import cpu_count
 from sentence_transformers import models, SentenceTransformer
 from torch import nn
@@ -68,8 +73,18 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Encode & Embed entities...")
 
-    embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                              normalize_embeddings=True)
+    onnx_run = False
+    if onnx_run:
+        session = InferenceSession("embeddings.onnx", providers=['CPUExecutionProvider'])
+
+        tokens = tokenizer(["I am happy", "I am glad"], return_tensors="np")
+
+        embeddings = session.run(None, dict(tokens))[0]
+
+    else:
+        embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
+                                   normalize_embeddings=True)
+
 
     #embeddings = np.concatenate(embeddings)
     # # To-Do: Make sure that the embeddings are normalized

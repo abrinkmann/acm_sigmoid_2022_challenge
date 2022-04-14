@@ -244,19 +244,19 @@ if __name__ == '__main__':
     expected_cand_size_X1 = 1000000
     expected_cand_size_X2 = 2000000
 
-    X_1 = pd.read_csv("X1.csv")
-    X_2 = pd.read_csv("X2.csv")
+    X_1 = pd.read_csv("../X1.csv")
+    X_2 = pd.read_csv("../X2.csv")
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
-    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1,"X1.csv")
+    X1_candidate_pairs = block_with_bm25(X_1, "title", expected_cand_size_X1, "../X1.csv")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, "X2.csv")
+    X2_candidate_pairs = block_with_bm25(X_2, "name", expected_cand_size_X1, "../X2.csv")
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 

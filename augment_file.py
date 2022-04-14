@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 
 
-X = pd.read_csv('X1.csv')
+X = pd.read_csv('../X1.csv')
 extended_X = X.copy()
 print(X.columns)
 highest_id = max(X['id'])

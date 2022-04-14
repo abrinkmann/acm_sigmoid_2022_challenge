@@ -261,8 +261,8 @@ if __name__ == '__main__':
     expected_cand_size_X1 = 1000000
     expected_cand_size_X2 = 2000000
 
-    X_1 = pd.read_csv("X1.csv")
-    X_2 = pd.read_csv("X2.csv")
+    X_1 = pd.read_csv("../X1.csv")
+    X_2 = pd.read_csv("../X2.csv")
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']

@@ -59,7 +59,7 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
             yield lst[i:i + n]
 
     if parallel:
-        with open('hyperparameter.txt', 'w') as f:
+        with open('../hyperparameter.txt', 'w') as f:
             f.write('Batch Size, Number of Threads, Worker, Processing time\n')
         for batch_size, configuration in itertools.product(batch_sizes, configurations):
             start = time.time()
@@ -105,7 +105,7 @@ def block(X, attr, expected_cand_size, k_hits, parallel, batch_sizes, configurat
                                                                                                      batch_size,
                                                                                                      configuration['num_threads'],
                                                                                                      configuration['worker']))
-            with open('hyperparameter.txt', 'a') as f:
+            with open('../hyperparameter.txt', 'a') as f:
                 f.write('{},{},{},{}\n'.format(batch_size, configuration['num_threads'], configuration['worker'], run_time))
             output_queue.close()
             output_queue.join_thread()
@@ -241,8 +241,8 @@ if __name__ == '__main__':
     expected_cand_size_X1 = 1000000
     expected_cand_size_X2 = 2000000
 
-    X_1 = pd.read_csv("X1.csv")
-    X_2 = pd.read_csv("X2.csv")
+    X_1 = pd.read_csv("../X1.csv")
+    X_2 = pd.read_csv("../X2.csv")
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
