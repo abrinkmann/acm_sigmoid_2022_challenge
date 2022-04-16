@@ -25,12 +25,11 @@ class BaseEncoder(nn.Module):
 
 class ContrastivePretrainModel(nn.Module):
 
-    def __init__(self, len_tokenizer, model='microsoft/xtremedistil-l6-h256-uncased', pool=True, proj=32, temperature=0.07):
+    def __init__(self, len_tokenizer, model='microsoft/xtremedistil-l6-h256-uncased', pool=True, proj=32):
         super().__init__()
 
         self.pool = pool
         self.proj = proj
-        self.temperature = temperature
         self.criterion = SupConLoss(self.temperature)
 
         self.encoder = BaseEncoder(len_tokenizer, model)
@@ -42,22 +41,17 @@ class ContrastivePretrainModel(nn.Module):
     def forward(self, input_ids, attention_mask, labels, input_ids_right, attention_mask_right):
         
         if self.pool:
-            output_left = self.encoder(input_ids, attention_mask)
-            output_left = mean_pooling(output_left, attention_mask)
-
-            output_right = self.encoder(input_ids_right, attention_mask_right)
-            output_right = mean_pooling(output_right, attention_mask_right)
+            output = self.encoder(input_ids, attention_mask)
+            output = mean_pooling(output, attention_mask)
         else:
-            output_left = self.encoder(input_ids, attention_mask)['pooler_output']
-            output_right = self.encoder(input_ids_right, attention_mask_right)['pooler_output']
-        
-        output = torch.cat((output_left.unsqueeze(1), output_right.unsqueeze(1)), 1)
+            output = self.encoder(input_ids, attention_mask)['pooler_output']
 
         output = torch.tanh(self.transform(output))
 
         output = F.normalize(output, dim=-1)
-
-        loss = self.criterion(output, labels)
+        
+        # calculating supcon loss would need different structure of batches here, so just setting to 0 since this is only inference model anyway
+        loss = 0
 
         return (loss, output)
 
