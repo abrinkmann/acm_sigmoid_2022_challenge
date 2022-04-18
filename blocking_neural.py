@@ -21,7 +21,6 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 
 tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-model = SentenceTransformer('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -54,22 +53,33 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     # Prepare pairs deduced from groups while waiting for search results
     # To-DO: Parallel processing of group candidate creation & model loading
     logger.info('Create group candidates')
+
+
     goup_ids = [i for i in range(len(pattern2id_1))]
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
-    # Add candidates from grouping
-    candidate_pairs_real_ids = []
 
-    for ids in tqdm(group2id_1.values()):
-        ids = list(sorted(ids))
-        for j in range(len(ids)):
-            for k in range(j + 1, len(ids)):
-                candidate_pairs_real_ids.append((ids[j], ids[k]))
+    # Create first candidates in subprocess while models are loaded
+    output_queue = Queue()
+    p = Process(target=create_group_candidates, args=(pattern2id_1, output_queue,))
+    p.start()
 
-    candidate_pairs_real_ids = list(set(candidate_pairs_real_ids))
+    logger.info('Load Models')
+    # To-Do: Load different models!
+    model = SentenceTransformer('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
     logger.info("Encode & Embed entities...")
 
-    onnx_run = True
+    # Add candidates from grouping
+    while p.is_alive():
+        if not output_queue.empty():
+            candidate_pairs_real_ids = output_queue.get()
+
+    p.join()
+    output_queue.close()
+    output_queue.join_thread()
+    time.sleep(0.1)
+
+    onnx_run = False
 
     if onnx_run:
         import onnxruntime
@@ -102,6 +112,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         embeddings = np.concatenate(embeddings, axis=0)
 
     else:
+        # To-Do: Experiment with different numbers of threads!
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
                                normalize_embeddings=True)
 
@@ -109,22 +120,27 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     # # To-Do: Make sure that the embeddings are normalized
     logger.info('Initialize faiss index')
     d = 32
-    m = 8
-    nlist = int(20*math.sqrt(len(embeddings)))
+    m = 16
+    nlist = int(8*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    faiss_index.train(embeddings)
+    no_training_records = nlist * 30
+    if embeddings.shape[0] < no_training_records:
+        faiss_index.train(embeddings)
+    else:
+        train_embeddings = np.random.choice(embeddings, no_training_records, replace=False)
+        faiss_index.train(train_embeddings)
     assert faiss_index.is_trained
     logger.info('Add embeddings to faiss index')
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 2     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
 
     # for index in tqdm(range(len(embeddings))):
     #     embedding = np.array([embeddings[index]])
@@ -134,6 +150,10 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > 0:
+                if (1 - distance) < 0.9:
+                    # Only collect pairs with high similarity
+                    break
+
                 if index == top_id:
                     continue
                 elif index < top_id:
@@ -187,13 +207,13 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 #         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
 #         output_q.put(result)
 
-
 def preprocess_input(doc):
     doc = doc[0].lower()
 
     stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
                   'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';']
-    regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de', '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
+    regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de',
+                    '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
 
     regex_list_2 = ['\/', '\|', '--\s', '-\s', '^-', '-$', ':\s', '\(', '\)', ',']
 
@@ -210,7 +230,8 @@ def preprocess_input(doc):
         gb_pattern.sort()
         for pattern in gb_pattern:
             doc = doc.replace(pattern, '')
-        doc = '{} {}'.format(gb_pattern[0].replace(' ', ''), doc) # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+        doc = '{} {}'.format(gb_pattern[0].replace(' ', ''),
+                             doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
 
     for regex in regex_list_2:
         doc = re.sub(regex, '', doc)
@@ -224,9 +245,20 @@ def preprocess_input(doc):
 
     return pattern
 
-
 def tokenize_input(doc):
     return tokenizer.tokenize(doc)
+
+
+
+def create_group_candidates(group2id_1, out_queue):
+    candidate_pairs_real_ids = []
+    for ids in tqdm(group2id_1.values()):
+        ids = list(sorted(ids))
+        for j in range(len(ids)):
+            for k in range(j + 1, len(ids)):
+                candidate_pairs_real_ids.append((ids[j], ids[k]))
+
+    out_queue.put(list(set(candidate_pairs_real_ids)))
 
 
 def save_output(X1_candidate_pairs,
@@ -266,14 +298,14 @@ if __name__ == '__main__':
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
-    k_x_1 = 3
+    k_x_1 = 10
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    k_x_2 = 3
+    k_x_2 = 10
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
