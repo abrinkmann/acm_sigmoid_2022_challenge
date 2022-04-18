@@ -125,7 +125,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
-        train_embeddings = np.random.choice(embeddings, no_training_records, replace=False)
+        train_embeddings = embeddings[np.random.randint(embeddings.shape[0], size=no_training_records, replace=False), :]
         faiss_index.train(train_embeddings)
     assert faiss_index.is_trained
     logger.info('Add embeddings to faiss index')
