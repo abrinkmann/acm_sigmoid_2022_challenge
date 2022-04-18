@@ -59,25 +59,18 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
 
     # Create first candidates in subprocess while models are loaded
-    output_queue = Queue()
-    p = Process(target=create_group_candidates, args=(pattern2id_1, output_queue,))
-    p.start()
+    candidate_pairs_real_ids = []
+    for ids in tqdm(group2id_1.values()):
+        ids = list(sorted(ids))
+        for j in range(len(ids)):
+            for k in range(j + 1, len(ids)):
+                candidate_pairs_real_ids.append((ids[j], ids[k]))
 
     logger.info('Load Models')
     # To-Do: Load different models!
     model = SentenceTransformer('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
     logger.info("Encode & Embed entities...")
-
-    # Add candidates from grouping
-    while p.is_alive():
-        if not output_queue.empty():
-            candidate_pairs_real_ids = output_queue.get()
-
-    p.join()
-    output_queue.close()
-    output_queue.join_thread()
-    time.sleep(0.1)
 
     onnx_run = False
 
@@ -245,20 +238,9 @@ def preprocess_input(doc):
 
     return pattern
 
+
 def tokenize_input(doc):
     return tokenizer.tokenize(doc)
-
-
-
-def create_group_candidates(group2id_1, out_queue):
-    candidate_pairs_real_ids = []
-    for ids in tqdm(group2id_1.values()):
-        ids = list(sorted(ids))
-        for j in range(len(ids)):
-            for k in range(j + 1, len(ids)):
-                candidate_pairs_real_ids.append((ids[j], ids[k]))
-
-    out_queue.put(list(set(candidate_pairs_real_ids)))
 
 
 def save_output(X1_candidate_pairs,
