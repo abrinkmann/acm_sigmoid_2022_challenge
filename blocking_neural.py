@@ -2,23 +2,18 @@ import csv
 import itertools
 import logging
 import math
-import os
 import re
-import time
 from collections import defaultdict
-from multiprocessing import Pool, Queue, Process
+from multiprocessing import Pool
 
 import faiss
 import numpy as np
-import torch
 
-from onnxruntime import InferenceSession
 from psutil import cpu_count
-from sentence_transformers import models, SentenceTransformer
-from torch import nn
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 import pandas as pd
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
@@ -72,44 +67,45 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Encode & Embed entities...")
 
-    onnx_run = False
+    # onnx_run = False
+    #
+    # if onnx_run:
+    #     import onnxruntime
+    #
+    #     #sess_options = onnxruntime.SessionOptions()
+    #     #sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+    #
+    #     ort_session = onnxruntime.InferenceSession("xtremedistil-l6-h256-uncased.onnx")
+    #
+    #     def encode_and_embed(examples):
+    #         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
+    #         tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='np')
+    #         dict_tokenized_input = dict(tokenized_input)
+    #         del dict_tokenized_input['token_type_ids']
+    #         # Hack to run on Windows
+    #         dict_tokenized_input = {k: v.astype(np.int64) for k,v in dict_tokenized_input.items()}
+    #         ort_outs = ort_session.run(None, dict_tokenized_input)
+    #         result = ort_outs[1]
+    #
+    #         return result
+    #
+    #     def chunks(lst, n):
+    #         """Yield successive n-sized chunks from lst."""
+    #         for i in tqdm(range(0, len(lst), n)):
+    #             yield lst[i:i + n]
+    #
+    #     embeddings = []
+    #     for examples in chunks(list(pattern2id_1.keys()), 256):
+    #         embeddings.append(encode_and_embed(examples))
+    #     embeddings = np.concatenate(embeddings, axis=0)
+    #
+    # else:
 
-    if onnx_run:
-        import onnxruntime
-
-        #sess_options = onnxruntime.SessionOptions()
-        #sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-
-        ort_session = onnxruntime.InferenceSession("xtremedistil-l6-h256-uncased.onnx")
-
-        def encode_and_embed(examples):
-            # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='np')
-            dict_tokenized_input = dict(tokenized_input)
-            del dict_tokenized_input['token_type_ids']
-            # Hack to run on Windows
-            dict_tokenized_input = {k: v.astype(np.int64) for k,v in dict_tokenized_input.items()}
-            ort_outs = ort_session.run(None, dict_tokenized_input)
-            result = ort_outs[1]
-
-            return result
-
-        def chunks(lst, n):
-            """Yield successive n-sized chunks from lst."""
-            for i in tqdm(range(0, len(lst), n)):
-                yield lst[i:i + n]
-
-        embeddings = []
-        for examples in chunks(list(pattern2id_1.keys()), 256):
-            embeddings.append(encode_and_embed(examples))
-        embeddings = np.concatenate(embeddings, axis=0)
-
-    else:
-        embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                               normalize_embeddings=True)
+    embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
+                           normalize_embeddings=True)
 
     #embeddings = np.concatenate(embeddings)
-    # # To-Do: Make sure that the embeddings are normalized
+    # Make sure that the embeddings are normalized --> cosine similarity
     logger.info('Initialize faiss index')
     d = 32
     m = 16
