@@ -120,7 +120,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 30
+    no_training_records = nlist * 40
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
