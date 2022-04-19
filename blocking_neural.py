@@ -105,7 +105,6 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         embeddings = np.concatenate(embeddings, axis=0)
 
     else:
-        # To-Do: Experiment with different numbers of threads!
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
                                normalize_embeddings=True)
 
@@ -128,15 +127,13 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
         train_embeddings = embeddings[np.random.choice(embeddings.shape[0], size=no_training_records, replace=False), :]
         faiss_index.train(train_embeddings)
     assert faiss_index.is_trained
+
     logger.info('Add embeddings to faiss index')
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
     candidate_group_pairs = []
     faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
-
-    # for index in tqdm(range(len(embeddings))):
-    #     embedding = np.array([embeddings[index]])
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
