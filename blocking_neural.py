@@ -228,7 +228,10 @@ def preprocess_input(doc):
     doc = re.sub('^\s*', '', doc)
 
     tokens = tokenizer.tokenize(doc)
-    pattern = tokenizer.convert_tokens_to_string(tokens[:16])
+    if len(tokens) > 0:
+        pattern = tokenizer.convert_tokens_to_string(tokens[:16])
+    else:
+        pattern = ''
 
     return pattern
 
