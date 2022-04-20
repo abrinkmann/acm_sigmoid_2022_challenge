@@ -141,14 +141,15 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
                 if index == top_id:
                     continue
                 elif index < top_id:
-                    candidate_group_pair = (index, top_id, distance)
+                    candidate_group_pair = (index, top_id)
                 else:
-                    candidate_group_pair = (top_id, index, distance)
+                    candidate_group_pair = (top_id, index)
 
                 candidate_group_pairs.append(candidate_group_pair)
 
     candidate_group_pairs = list(set(candidate_group_pairs))
 
+    # TO-DO: Sort by similarity
     logger.info('GroupIds to real ids')
     for pair in tqdm(candidate_group_pairs):
         real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
