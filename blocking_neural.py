@@ -210,14 +210,15 @@ def preprocess_input(doc):
         doc = re.sub(regex, '', doc)
 
     # Move GB pattern to beginning of doc
-    gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
+    # gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
 
-    if len(gb_pattern) > 0:
-        gb_pattern.sort()
-        for pattern in gb_pattern:
-            doc = doc.replace(pattern, '')
-        doc = '{} {}'.format(gb_pattern[0].replace(' ', ''),
-                             doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+    # if len(gb_pattern) > 0:
+    #     gb_pattern.sort()
+    #     for pattern in gb_pattern:
+    #         if pattern in doc:
+    #             doc = doc.replace(pattern, '')
+    #     doc = '{} {}'.format(gb_pattern[0].replace(' ', ''),
+    #                          doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
 
     for regex in regex_list_2:
         doc = re.sub(regex, '', doc)
