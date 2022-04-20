@@ -127,14 +127,14 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 100     # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > 0:
-                if (1 - distance) < 0.8:
+                if (1 - distance) < 0.75:
                     # Only collect pairs with high similarity
                     break
 
