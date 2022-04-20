@@ -32,24 +32,22 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     pool = Pool(worker)
     X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
 
-    if path_to_preprocessed_file is not None:
-        X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
-        X.to_csv(path_to_preprocessed_file, sep=',', encoding='utf-8', index=False, quoting=csv.QUOTE_MINIMAL)
+    # if path_to_preprocessed_file is not None:
+    #     X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
+    #     X.to_csv(path_to_preprocessed_file, sep=',', encoding='utf-8', index=False, quoting=csv.QUOTE_MINIMAL)
 
     pool.close()
     pool.join()
 
-    pattern2id_1 = defaultdict(list)
-    logger.info("Group products...")
 
+    logger.info("Group products...")
+    pattern2id_1 = defaultdict(list)
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
 
     # Prepare pairs deduced from groups while waiting for search results
     # To-DO: Parallel processing of group candidate creation & model loading
     logger.info('Create group candidates')
-
-
     goup_ids = [i for i in range(len(pattern2id_1))]
     group2id_1 = dict(zip(goup_ids, pattern2id_1.values()))
 
@@ -63,7 +61,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info('Load Models')
     # To-Do: Load different models!
-    model = SentenceTransformer('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+    model = SentenceTransformer('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
     logger.info("Encode & Embed entities...")
 
