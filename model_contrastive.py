@@ -11,7 +11,7 @@ def mean_pooling(model_output, attention_mask):
 
 class BaseEncoder(nn.Module):
 
-    def __init__(self, len_tokenizer, model='microsoft/xtremedistil-l6-h256-uncased'):
+    def __init__(self, len_tokenizer, model='models/xtremedistil-l6-h256-uncased'):
         super().__init__()
 
         self.transformer = AutoModel.from_pretrained(model)
@@ -25,7 +25,7 @@ class BaseEncoder(nn.Module):
 
 class ContrastivePretrainModel(nn.Module):
 
-    def __init__(self, len_tokenizer, model='microsoft/xtremedistil-l6-h256-uncased', pool=True, proj=32):
+    def __init__(self, len_tokenizer, model='models/xtremedistil-l6-h256-uncased', pool=True, proj=32):
         super().__init__()
 
         self.pool = pool

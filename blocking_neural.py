@@ -18,7 +18,7 @@ from transformers import AutoTokenizer
 
 from model_contrastive import ContrastivePretrainModel
 
-tokenizer = AutoTokenizer.from_pretrained('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path):  # replace with your logic.
     '''
@@ -65,7 +65,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     if model_type == 'sbert':
         logger.info('Load Models')
         # To-Do: Load different models!
-        model = SentenceTransformer('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+        model = SentenceTransformer('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
         logger.info("Encode & Embed entities...")
 
@@ -279,14 +279,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/X1_model_len16_trans32.bin')
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans32.bin')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/X2_model_len16_trans32.bin')
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans32.bin')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
