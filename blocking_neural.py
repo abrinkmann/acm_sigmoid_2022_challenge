@@ -8,6 +8,7 @@ from multiprocessing import Pool
 
 import faiss
 import numpy as np
+import torch
 
 from psutil import cpu_count
 from sentence_transformers import SentenceTransformer
@@ -15,9 +16,11 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 
+from model_contrastive import ContrastivePretrainModel
+
 tokenizer = AutoTokenizer.from_pretrained('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -59,23 +62,44 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
             for k in range(j + 1, len(ids)):
                 candidate_pairs_real_ids.append((ids[j], ids[k]))
 
-    logger.info('Load Models')
-    # To-Do: Load different models!
-    model = SentenceTransformer('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+    if model_type == 'sbert':
+        logger.info('Load Models')
+        # To-Do: Load different models!
+        model = SentenceTransformer('sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
-    logger.info("Encode & Embed entities...")
+        logger.info("Encode & Embed entities...")
 
-    embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                           normalize_embeddings=True)
+        embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
+                               normalize_embeddings=True)
 
-    # TO-DO: Load Ralph's Models!
-    # embeddings = []
-    # logger.info('Load Models')
-    # model = (*args, **kwargs)
-    # model.load_state_dict(torch.load(PATH))
-    # model.eval()
+    elif model_type == 'supcon':
+        logger.info('Load Models')
+        model = ContrastivePretrainModel(len_tokenizer=len(tokenizer))
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        model.eval()
 
-    logger.info("Encode & Embed entities...")
+        logger.info("Encode & Embed entities...")
+
+        def encode_and_embed(examples):
+            with torch.no_grad():
+                tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='pt')
+                encoded_output = model(input_ids=tokenized_input['input_ids'],
+                                       attention_mask=tokenized_input['attention_mask'])
+                return encoded_output[1]
+
+        def chunks(lst, n):
+            """Yield successive n-sized chunks from lst."""
+            for i in tqdm(range(0, len(lst), n)):
+                yield lst[i:i + n]
+
+        embeddings = []
+        for examples in chunks(list(pattern2id_1.keys()), 256):
+            embeddings.append(encode_and_embed(examples))
+        embeddings = np.concatenate(embeddings, axis=0)
+
+
+    else:
+        logger.warning("Model Type {} not defined!".format(model_type))
 
 
     #embeddings = np.concatenate(embeddings)
@@ -90,7 +114,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 40
+    no_training_records = nlist * 40 # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -103,7 +127,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
 
     logger.info("Search products...")
     candidate_group_pairs = []
-    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search
+    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
@@ -254,15 +278,15 @@ if __name__ == '__main__':
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
-    k_x_1 = 10
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None)
+    k_x_1 = 15
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/X1_model_len16_trans32.bin')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
-    k_x_2 = 10
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None)
+    k_x_2 = 15
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/X2_model_len16_trans32.bin')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
