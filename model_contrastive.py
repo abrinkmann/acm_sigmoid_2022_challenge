@@ -25,7 +25,7 @@ class BaseEncoder(nn.Module):
 
 class ContrastivePretrainModel(nn.Module):
 
-    def __init__(self, len_tokenizer, model='models/xtremedistil-l6-h256-uncased', pool=True, proj=32):
+    def __init__(self, len_tokenizer, model='models/xtremedistil-l6-h256-uncased', pool=True, proj=128):
         super().__init__()
 
         self.pool = pool

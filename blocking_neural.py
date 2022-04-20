@@ -20,7 +20,7 @@ from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path, transitive):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -148,8 +148,9 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
                 candidate_group_pairs.append(candidate_group_pair)
 
     candidate_group_pairs = list(set(candidate_group_pairs))
+    if transitive:
+        candidate_group_pairs = determine_transitive_matches(candidate_group_pairs)
 
-    # TO-DO: Sort by similarity
     logger.info('GroupIds to real ids')
     for pair in tqdm(candidate_group_pairs):
         real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
@@ -166,31 +167,37 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
 
     return candidate_pairs_real_ids
 
-# def encode_and_embed_parallel(input_q, output_q, num_threads):
-#     tokenizer = AutoTokenizer.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-#     special_tokens_dict = {
-#         'additional_special_tokens': ['lenovo', 'thinkpad', 'elitebook', 'toshiba', 'asus', 'acer', 'lexar', 'sandisk',
-#                                       'tesco', 'intenso', 'transcend']}
-#     num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
-#     model = AutoModel.from_pretrained("microsoft/xtremedistil-l6-h256-uncased")
-#     model.resize_token_embeddings(len(tokenizer))
-#
-#     ff_layer = nn.Linear(256, 64, bias=False)
-#
-#     torch.set_num_threads(num_threads)
-#
-#     while not input_q.empty():
-#         examples = input_q.get()
-#         with torch.no_grad():
-#             tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=16, return_tensors='pt')
-#             encoded_output = model(input_ids=tokenized_input['input_ids'],
-#                                    attention_mask=tokenized_input['attention_mask'],
-#                                    token_type_ids=tokenized_input['token_type_ids'])
-#             #result = mean_pooling(encoded_output, tokenized_input['attention_mask'])
-#             #result = ff_layer(result)
-#
-#         # tokenized_output = tokenizer(examples['title'], padding="max_length", truncation=True, max_length=64)
-#         output_q.put(result)
+
+def determine_transitive_matches(candidate_pairs):
+    change = True
+    while change:
+        cluster = []
+        #print(len(pairs))
+        old_length = len(candidate_pairs)
+        while len(candidate_pairs) > 0:
+            pair = candidate_pairs.pop()
+            removable_pairs = []
+            for new_candidate_pair in candidate_pairs:
+                matches = sum([1 for element in new_candidate_pair if element in pair])
+                if matches > 0:
+                    removable_pairs.append(new_candidate_pair)
+                    pair = tuple(set(pair + new_candidate_pair))
+
+            cluster.append(pair)
+            candidate_pairs = [pair for pair in candidate_pairs if pair not in removable_pairs]
+
+        candidate_pairs = cluster
+        change = len(candidate_pairs) != old_length
+
+    cluster_pair_dict = {'clu_{}'.format(i): candidate_pairs[i] for i in range(0, len(candidate_pairs))}
+    new_candidate_pairs = []
+    for pattern in tqdm(cluster_pair_dict):
+        ids = list(sorted(cluster_pair_dict[pattern]))
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                new_candidate_pairs.append((ids[i], ids[j]))
+
+    return new_candidate_pairs
 
 def preprocess_input(doc):
     if len(doc) == 0:
@@ -280,14 +287,16 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans32.bin')
+    transitive = False
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans128.bin', transitive)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans32.bin')
+    transitive = False
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans128.bin', transitive)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
