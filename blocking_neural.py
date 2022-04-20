@@ -134,7 +134,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > 0:
-                if (1 - distance) < 0.5:
+                if (1 - distance) < 0.75:
                     # Only collect pairs with high similarity
                     break
 
@@ -287,7 +287,7 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    transitive = False
+    transitive = True
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans128.bin', transitive)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
@@ -295,7 +295,7 @@ if __name__ == '__main__':
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    transitive = False
+    transitive = True
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans128.bin', transitive)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
