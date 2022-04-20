@@ -30,7 +30,7 @@ class ContrastivePretrainModel(nn.Module):
 
         self.pool = pool
         self.proj = proj
-        self.criterion = SupConLoss(self.temperature)
+        #self.criterion = SupConLoss(self.temperature)
 
         self.encoder = BaseEncoder(len_tokenizer, model)
         self.config = self.encoder.transformer.config
@@ -38,7 +38,7 @@ class ContrastivePretrainModel(nn.Module):
         self.transform = nn.Linear(self.config.hidden_size, self.proj)
 
         
-    def forward(self, input_ids, attention_mask, labels, input_ids_right, attention_mask_right):
+    def forward(self, input_ids, attention_mask):
         
         if self.pool:
             output = self.encoder(input_ids, attention_mask)
