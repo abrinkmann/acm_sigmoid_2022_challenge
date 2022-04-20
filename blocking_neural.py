@@ -197,7 +197,7 @@ def preprocess_input(doc):
     doc = doc[0].lower()
 
     stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
-                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';']
+                  'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';', '""']
     regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de',
                     '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
 
@@ -210,15 +210,15 @@ def preprocess_input(doc):
         doc = re.sub(regex, '', doc)
 
     # Move GB pattern to beginning of doc
-    # gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
+    gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
 
-    # if len(gb_pattern) > 0:
-    #     gb_pattern.sort()
-    #     for pattern in gb_pattern:
-    #         if pattern in doc:
-    #             doc = doc.replace(pattern, '')
-    #     doc = '{} {}'.format(gb_pattern[0].replace(' ', ''),
-    #                          doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+    if len(gb_pattern) > 0:
+        gb_pattern.sort()
+        for pattern in gb_pattern:
+            if pattern in doc:
+                doc = doc.replace(pattern, '')
+        doc = '{} {}'.format(gb_pattern[0].replace(' ', ''),
+                             doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
 
     for regex in regex_list_2:
         doc = re.sub(regex, '', doc)
@@ -227,13 +227,13 @@ def preprocess_input(doc):
     doc = re.sub('\s*$', '', doc)
     doc = re.sub('^\s*', '', doc)
 
-    tokens = tokenizer.tokenize(doc)
-    if len(tokens) > 0:
-        pattern = tokenizer.convert_tokens_to_string(tokens[:16])
-    else:
-        pattern = ''
+    # tokens = tokenizer.tokenize(doc)
+    # if len(tokens) > 0:
+    #     pattern = tokenizer.convert_tokens_to_string(tokens[:16])
+    # else:
+    #     pattern = ''
 
-    return pattern
+    return doc[:64]
 
 
 def tokenize_input(doc):
