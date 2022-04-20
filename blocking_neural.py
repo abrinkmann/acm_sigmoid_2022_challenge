@@ -81,9 +81,9 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with yo
     #embeddings = np.concatenate(embeddings)
     # Make sure that the embeddings are normalized --> cosine similarity
     logger.info('Initialize faiss index')
-    d = 32
+    d = embeddings.shape[1]
     m = 16
-    nlist = int(8*math.sqrt(len(embeddings)))
+    nlist = int(4*math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
