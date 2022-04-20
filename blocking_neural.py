@@ -15,7 +15,7 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
+#tokenizer = AutoTokenizer.from_pretrained('ABrinkmann/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
 def block_neural(X, attr, k_hits, path_to_preprocessed_file):  # replace with your logic.
     '''
@@ -237,7 +237,7 @@ def preprocess_input(doc):
 
 
 def tokenize_input(doc):
-    return tokenizer.tokenize(doc)
+    return doc[:64]
 
 
 def save_output(X1_candidate_pairs,
