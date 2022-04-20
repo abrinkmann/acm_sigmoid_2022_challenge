@@ -134,7 +134,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > 0:
-                if (1 - distance) < 0.75:
+                if (1 - distance) < 0.5:
                     # Only collect pairs with high similarity
                     break
 
