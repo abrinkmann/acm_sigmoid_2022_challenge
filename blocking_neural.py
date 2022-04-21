@@ -114,7 +114,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 40 # Experiment with number of training records
+    no_training_records = nlist * 120 # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -285,7 +285,7 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    proj_x_1 = 64
+    proj_x_1 = 128
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon',
                                       'models/supcon/X1_model_len16_trans{}.bin'.format(proj_x_1), proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    proj_x_2 = 64
+    proj_x_2 = 128
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon',
                                       'models/supcon/X2_model_len16_trans{}.bin'.format(proj_x_2), proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
