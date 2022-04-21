@@ -20,7 +20,7 @@ from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path, proj):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -74,7 +74,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
 
     elif model_type == 'supcon':
         logger.info('Load Models')
-        model = ContrastivePretrainModel(len_tokenizer=len(tokenizer))
+        model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=proj)
         model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
         model.eval()
 
@@ -285,14 +285,18 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans32.bin')
+    proj_x_1 = 64
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon',
+                                      'models/supcon/X1_model_len16_trans{}.bin'.format(proj_x_1), proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans32.bin')
+    proj_x_2 = 64
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon',
+                                      'models/supcon/X2_model_len16_trans{}.bin'.format(proj_x_2), proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
