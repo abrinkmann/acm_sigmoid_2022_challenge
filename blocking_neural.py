@@ -21,6 +21,21 @@ from model_contrastive import ContrastivePretrainModel
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 seq_length = 32
 
+
+# def load_normalization():
+#     """Load Normalization file - Especially for D2"""
+#     normalizations = {}
+#     with open('normalization.txt', 'r') as f:
+#         for line in f.readlines():
+#             line_values = line.split(',')
+#             normalizations[line_values[0]] = line_values[1]
+#
+#     return normalizations
+#
+#
+# normalizations = load_normalization()
+
+
 def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path, proj):  # replace with your logic.
     '''
     This function performs blocking using elastic search
@@ -36,13 +51,12 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     pool = Pool(worker)
     X['preprocessed'] = pool.map(preprocess_input, tqdm(list(X[attr].values)))
 
-    # if path_to_preprocessed_file is not None:
-    #     X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
-    #     X.to_csv(path_to_preprocessed_file, sep=',', encoding='utf-8', index=False, quoting=csv.QUOTE_MINIMAL)
+    if path_to_preprocessed_file is not None:
+        X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
+        X.to_csv(path_to_preprocessed_file, sep=',', encoding='utf-8', index=False, quoting=csv.QUOTE_MINIMAL)
 
     pool.close()
     pool.join()
-
 
     logger.info("Group products...")
     pattern2id_1 = defaultdict(list)
@@ -71,7 +85,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
         logger.info("Encode & Embed entities...")
 
         embeddings = model.encode(list(pattern2id_1.keys()), batch_size=256, show_progress_bar=True,
-                               normalize_embeddings=True)
+                                  normalize_embeddings=True)
 
     elif model_type == 'supcon':
         logger.info('Load Models')
@@ -83,7 +97,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
 
         def encode_and_embed(examples):
             with torch.no_grad():
-                tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=seq_length, return_tensors='pt')
+                tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=seq_length,
+                                            return_tensors='pt')
                 encoded_output = model(input_ids=tokenized_input['input_ids'],
                                        attention_mask=tokenized_input['attention_mask'])
                 return encoded_output[1]
@@ -102,20 +117,19 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     else:
         logger.warning("Model Type {} not defined!".format(model_type))
 
-
-    #embeddings = np.concatenate(embeddings)
+    # embeddings = np.concatenate(embeddings)
     # Make sure that the embeddings are normalized --> cosine similarity
     logger.info('Initialize faiss index')
     d = embeddings.shape[1]
     m = 16
-    nlist = int(4*math.sqrt(len(embeddings)))
+    nlist = int(4 * math.sqrt(len(embeddings)))
     quantizer = faiss.IndexFlatIP(d)
-    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
-    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8) # 8 specifies that each sub-vector is encoded as 8 bits
+    # faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 120 # Experiment with number of training records
+    no_training_records = nlist * 40  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -127,7 +141,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = 10  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
@@ -174,7 +188,8 @@ def preprocess_input(doc):
         doc = doc[0].lower()
 
         stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
-                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';', '""']
+                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '&nbsp;', '& ', '', ';', '""', '\\n',
+                      'tesco direct']
         regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de',
                         '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)']
 
@@ -185,6 +200,9 @@ def preprocess_input(doc):
 
         for regex in regex_list_1:
             doc = re.sub(regex, '', doc)
+
+        # for key in normalizations:
+        #     doc = doc.replace(key, normalizations[key])
 
         # Move GB pattern to beginning of doc
         gb_pattern = re.findall('(\d+\s*gb|\d+\s*go)', doc)
@@ -244,13 +262,15 @@ def save_output(X1_candidate_pairs,
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger()
 
     expected_cand_size_X1 = 1000000
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    expected_cand_size_X1 = 2814
-    expected_cand_size_X2 = 4392
+    #logger.warning('NOT A REAL SUBMISSION!')
+    #expected_cand_size_X1 = 2814
+    #expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
@@ -266,7 +286,7 @@ if __name__ == '__main__':
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    #X2_candidate_pairs = []
+    # X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
     proj_x_2 = 32
@@ -278,5 +298,7 @@ if __name__ == '__main__':
 
     # save results
     save_output(X1_candidate_pairs, X2_candidate_pairs)
-    logger = logging.getLogger()
+
+    if expected_cand_size_X1 < 1000000:
+        logger.warning('NOT A REAL SUBMISSION!')
     logger.info('Candidates saved!')
