@@ -20,7 +20,7 @@ from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path, transitive):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_path):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -126,11 +126,11 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    candidate_group_pairs = []
     faiss_index.nprobe = 10     # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
+    pair2sim = defaultdict(float)
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > 0:
@@ -145,11 +145,9 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, model_type, model_p
                 else:
                     candidate_group_pair = (top_id, index)
 
-                candidate_group_pairs.append(candidate_group_pair)
+                pair2sim[candidate_group_pair] = (1 - distance)
 
-    candidate_group_pairs = list(set(candidate_group_pairs))
-    if transitive:
-        candidate_group_pairs = determine_transitive_matches(candidate_group_pairs)
+    candidate_group_pairs = [k for k, _ in sorted(pair2sim.items(), key=lambda k_v: k_v[1], reverse=True)]
 
     logger.info('GroupIds to real ids')
     for pair in tqdm(candidate_group_pairs):
@@ -287,16 +285,14 @@ if __name__ == '__main__':
                      'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
 
     k_x_1 = 15
-    transitive = True
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans128.bin', transitive)
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, 'supcon', 'models/supcon/X1_model_len16_trans32.bin')
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #X2_candidate_pairs = []
     stop_words_x2 = []
     k_x_2 = 15
-    transitive = True
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans128.bin', transitive)
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, 'supcon', 'models/supcon/X2_model_len16_trans32.bin')
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
