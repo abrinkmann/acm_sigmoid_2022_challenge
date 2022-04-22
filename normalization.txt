@@ -30,6 +30,8 @@ pen drive,usb stick
 pendrive,usb stick
 flash drive,usb stick
 flashdrive,usb stick
+flashdisk,usb stick
+usb flash,usb stick
 memoire,memory
 mémoire,memory
 memorie,memory

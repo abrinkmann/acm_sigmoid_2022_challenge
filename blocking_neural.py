@@ -19,7 +19,7 @@ from transformers import AutoTokenizer
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-seq_length = 24
+seq_length = 32
 
 
 def load_normalization():
@@ -121,7 +121,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     logger.info('Initialize faiss index')
     d = embeddings.shape[1]
     m = 16
-    nlist = int(4 * math.sqrt(len(embeddings)))
+    nlist = int(4 * math.sqrt(embeddings.shape[0]))
     quantizer = faiss.IndexFlatIP(d)
     # faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
@@ -187,14 +187,14 @@ def preprocess_input(doc, normalizations):
         doc = doc[0].lower()
 
         stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
-                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '\'\'', '""', '\n',
+                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '\'\'', '""', '\\\\n',
                       'tesco direct', 'color', ' y ', ' et ', 'tipo a', 'type-a', 'type a', 'informática', ' de ',
                       ' con ', ' new']
 
         stop_signs = ['&nbsp;', '&quot;', '&amp;', ',', ';', '-', ':', '|', '/', '(', ')', '/', '&']
 
         regex_list_1 = ['^dell*', '[\d\w]*\.com', '[\d\w]*\.ca', '[\d\w]*\.fr', '[\d\w]*\.de', '[\d\w]*\.es',
-                        '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)', '\n']
+                        '(\d+\s*gb\s*hdd|\d+\s*gb\s*ssd)', '\\\\n']
 
         for stop_word in stop_words:
             doc = doc.replace(stop_word, ' ')
