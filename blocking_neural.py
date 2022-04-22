@@ -123,7 +123,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     m = 16
     nlist = int(4 * math.sqrt(embeddings.shape[0]))
     quantizer = faiss.IndexFlatIP(d)
-    # faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
+    #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
@@ -147,11 +147,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     pair2sim = defaultdict(float)
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
-            if top_id > 0:
-                if (1 - distance) < 0.1:
-                    # Only collect pairs with high similarity
-                    break
-
+            if top_id > -1:
                 if index == top_id:
                     continue
                 elif index < top_id:
@@ -186,7 +182,7 @@ def preprocess_input(doc, normalizations):
     else:
         doc = doc[0].lower()
 
-        stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'cheap', 'core',
+        stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'foto de angelis', 'cheap', 'core',
                       'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '\'\'', '""', '\\\\n',
                       'tesco direct', 'color', ' y ', ' et ', 'tipo a', 'type-a', 'type a', 'informática', ' de ',
                       ' con ', ' new']
@@ -206,7 +202,7 @@ def preprocess_input(doc, normalizations):
             doc = re.sub(regex, '', doc)
 
         # Move GB pattern to beginning of doc
-        gb_pattern = re.findall('(\d+\s*gb|\d+\s*go|\d+\s*bbeu|\d+\s*gabeu)', doc)
+        gb_pattern = re.findall('(d+\s*gbbeuk|\d+\s*gbbeu|\d+\s*gb|\d+\s*go|\d+\s*bbeu|\d+\s*gabeu)', doc)
 
         if len(gb_pattern) > 0:
             gb_pattern.sort()
@@ -214,9 +210,11 @@ def preprocess_input(doc, normalizations):
                 gb_pattern.remove(gb_pattern[0])
 
             if len(gb_pattern) > 0:
-                doc = re.sub('(\d+\s*gb|\d+\s*go|\d+\s*bbeu|\d+\s*gabeu)', ' ', doc)
-                doc = '{} {}'.format(gb_pattern[0].replace(' ', '').replace('go', 'gb').replace('bbeu', 'gb'),
+                doc = re.sub('(d+\s*gbbeuk|\d+\s*gbbeu|\d+\s*gb|\d+\s*go|\d+\s*bbeu|\d+\s*gabeu)', ' ', doc)
+                doc = '{} {}'.format(gb_pattern[0].replace(' ', '').replace('go', 'gb').replace('gbbeuk', 'gb').replace('gbbeu', 'gb').replace('bbeu', 'gb'),
                                      doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+
+        doc = re.sub('\s\s+', ' ', doc)
 
         if normalizations is not None:
             for key in normalizations:
@@ -281,20 +279,20 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    # logger.warning('NOT A REAL SUBMISSION!')
-    # expected_cand_size_X1 = 2814
-    # expected_cand_size_X2 = 4392
+    logger.warning('NOT A REAL SUBMISSION!')
+    expected_cand_size_X1 = 2814
+    expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
 
     stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ']
+                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'abfoto']
 
     k_x_1 = 15
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv', normalizations_x_1, 'supcon',
                                       'models/supcon/len{}/X1_model_len{}_trans{}.bin'.format(seq_length, seq_length,
                                                                                               proj_x_1), proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
@@ -305,7 +303,7 @@ if __name__ == '__main__':
     k_x_2 = 15
     proj_x_2 = 32
     normalizations_x_2 = load_normalization()
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv', normalizations_x_2, 'supcon',
                                       'models/supcon/len{}/X2_model_len{}_trans{}.bin'.format(seq_length, seq_length,
                                                                                               proj_x_2), proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:

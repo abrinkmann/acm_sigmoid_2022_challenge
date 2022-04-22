@@ -1,7 +1,5 @@
 carte memoire,memory card
 carte mémoire,memory card
-carte sdxc,memory card
-carte sd,memory card
 scheda di memoria,memory card
 tarjeta de memoria,memory card
 speicherkarte,memory card
@@ -20,6 +18,7 @@ chiavetta usb,usb stick
 usb minne,usb stick
 pami?ci przeno?ne,usb stick
 clé usb,usb stick
+clé micro usb, micro usb stick
 clés usb,usb stick
 memoria usb,usb stick
 speicherstick,usb stick
@@ -32,6 +31,7 @@ flash drive,usb stick
 flashdrive,usb stick
 flashdisk,usb stick
 usb flash,usb stick
+microusb,micro usb
 memoire,memory
 mémoire,memory
 memorie,memory
@@ -77,6 +77,7 @@ weiß,white
 weiss,white
 bianco,white
 wit,white
+vit,white
 biały,white
 noir,black
 schwarz,black
@@ -88,6 +89,7 @@ czarny,black
 violett,purple
 violeta,purple
 violet,purple
+mauve,purple
 lilla,purple
 lila,purple
 viola,purple
@@ -95,6 +97,7 @@ morado,purple
 paars,purple
 fioletowy,purple
 fialovy,purple
+fialový,purple
 aranciato,orange
 naranja,orange
 oranje,orange
@@ -123,10 +126,7 @@ plata,silver
 plateado,silver
 zilver,silver
 srebro,silver
-usb stick usb stick,usb stick
-usb stick usb,usb stick
-memory card memory card, memory card
-memory card memory, memory card
-usb usb, usb
-memory memory, memory
-card card, card
+professionnelles,professional
+professionale,professional
+flash,
+xqd xqd,xqd
