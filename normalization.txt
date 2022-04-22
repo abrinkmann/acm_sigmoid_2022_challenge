@@ -1,0 +1,121 @@
+carte memoire,memory card
+carte mémoire,memory card
+carte sdxc,memory card
+carte sd,memory card
+scheda di memoria,memory card
+tarjeta de memoria,memory card
+speicherkarte,memory card
+flashgeheugenkaart,memory card
+geheugenkaart,memory card
+memoriakartya,memory card
+memóriakártya,memory card
+minneskort,memory card
+karty pami?ci,memory card
+karty pami,memory card
+pam??ová karta,memory card
+pam??ova karta,memory card
+cle usb,usb stick
+llave usb,usb stick
+chiavetta usb,usb stick
+usb-minne,usb stick
+pami?ci przeno?ne,usb stick
+clé usb,usb stick
+clés usb,usb stick
+memoria usb,usb stick
+speicherstick,usb stick
+flash-laufwerk,usb stick
+flash laufwerk,usb stick
+flashlaufwerk,usb stick
+flashstation,usb stick
+pen drive,usb stick
+pendrive,usb stick
+flash drive,usb stick
+flashdrive,usb stick
+memoire,memory
+mémoire,memory
+memorie,memory
+memoria,memory
+pami?ci,memory
+pam??,card
+pami??,memory
+carte,card
+tarjeta,card
+karta,card
+karty,card
+pami,card
+scheda,card
+karte,card
+rouge,red
+rot,red
+rosso,red
+rojo,red
+rood,red
+czerwony,red
+bleu,blue
+blau,blue
+azuro,blue
+azul,blue
+blauw,blue
+niebieski,blue
+jaune,yellow
+gelb,yellow
+giallo,yellow
+amarillo,yellow
+geel,yellow
+żółty,yellow
+vert,green
+grün,green
+verde,green
+verde,green
+groen,green
+zielony,green
+blanc,white
+weiß,white
+weiss,white
+bianco,white
+blanco,white
+wit,white
+biały,white
+noir,black
+schwarz,black
+nero,black
+negro,black
+zwart,black
+czerń,black
+czarny,black
+violett,purple
+violeta,purple
+violet,purple
+lilla,purple
+lila,purple
+viola,purple
+morado,purple
+paars,purple
+fioletowy,purple
+aranciato,orange
+naranja,orange
+oranje,orange
+pomarańcza,orange
+marron,brown
+braun,brown
+bruno,brown
+marrón,brown
+bruin,brown
+brązowy,brown
+gris,grey
+grau,grey
+grigio,grey
+grigia,grey
+gris,grey
+grijs,grey
+szary,grey
+argentin,silver
+blister aluminium,silver
+kovovy,silver
+argento,silver
+silber,silver
+argenteo,silver
+plata,silver
+plateado,silver
+zilver,silver
+srebro,silver
