@@ -17,13 +17,12 @@ pam??ova karta,memory card
 cle usb,usb stick
 llave usb,usb stick
 chiavetta usb,usb stick
-usb-minne,usb stick
+usb minne,usb stick
 pami?ci przeno?ne,usb stick
 clé usb,usb stick
 clés usb,usb stick
 memoria usb,usb stick
 speicherstick,usb stick
-flash-laufwerk,usb stick
 flash laufwerk,usb stick
 flashlaufwerk,usb stick
 flashstation,usb stick
@@ -51,6 +50,7 @@ rosso,red
 rojo,red
 rood,red
 czerwony,red
+bleue,blue
 bleu,blue
 blau,blue
 azuro,blue
@@ -69,11 +69,11 @@ verde,green
 verde,green
 groen,green
 zielony,green
+blanco,white
 blanc,white
 weiß,white
 weiss,white
 bianco,white
-blanco,white
 wit,white
 biały,white
 noir,black
@@ -92,6 +92,7 @@ viola,purple
 morado,purple
 paars,purple
 fioletowy,purple
+fialovy,purple
 aranciato,orange
 naranja,orange
 oranje,orange
@@ -102,7 +103,7 @@ bruno,brown
 marrón,brown
 bruin,brown
 brązowy,brown
-gris,grey
+grise,grey
 grau,grey
 grigio,grey
 grigia,grey
@@ -111,6 +112,7 @@ grijs,grey
 szary,grey
 argentin,silver
 blister aluminium,silver
+kovový,silver
 kovovy,silver
 argento,silver
 silber,silver
@@ -119,3 +121,10 @@ plata,silver
 plateado,silver
 zilver,silver
 srebro,silver
+usb stick usb stick,usb stick
+usb stick usb,usb stick
+memory card memory card, memory card
+memory card memory, memory card
+usb usb, usb
+memory memory, memory
+card card, card
