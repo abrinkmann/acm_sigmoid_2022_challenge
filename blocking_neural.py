@@ -19,7 +19,7 @@ from transformers import AutoTokenizer
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-seq_length = 32
+seq_length = 24
 
 
 def load_normalization():
@@ -128,7 +128,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 200  # Experiment with number of training records
+    no_training_records = nlist * 40  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -140,7 +140,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    faiss_index.nprobe = 50  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = 10  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
@@ -148,6 +148,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > -1:
+                if (1 - distance) < 0.1:
+                    break
                 if index == top_id:
                     continue
                 elif index < top_id:
@@ -279,9 +281,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    logger.warning('NOT A REAL SUBMISSION!')
-    expected_cand_size_X1 = 2814
-    expected_cand_size_X2 = 4392
+    # logger.warning('NOT A REAL SUBMISSION!')
+    # expected_cand_size_X1 = 2814
+    # expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
