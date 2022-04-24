@@ -19,7 +19,7 @@ from transformers import AutoTokenizer
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-seq_length = 32
+seq_length = 24
 
 
 def load_normalization():
@@ -281,9 +281,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    # logger.warning('NOT A REAL SUBMISSION!')
-    # expected_cand_size_X1 = 2814
-    # expected_cand_size_X2 = 4392
+    logger.warning('NOT A REAL SUBMISSION!')
+    expected_cand_size_X1 = 2814
+    expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
@@ -306,7 +306,7 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = load_normalization()
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv', normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}.bin'.format(seq_length, seq_length,
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length, seq_length,
                                                                                               proj_x_2), proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
