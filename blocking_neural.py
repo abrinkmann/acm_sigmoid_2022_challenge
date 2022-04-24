@@ -19,7 +19,7 @@ from transformers import AutoTokenizer
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-seq_length = 24
+seq_length = 32
 
 
 def load_normalization():
