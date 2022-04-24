@@ -295,7 +295,7 @@ if __name__ == '__main__':
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv', normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}.bin'.format(seq_length, seq_length,
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length, seq_length,
                                                                                               proj_x_1), proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
