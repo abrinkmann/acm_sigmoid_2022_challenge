@@ -175,9 +175,11 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
             else:
                 continue
             candidate_pairs_real_ids.append(candidate_pair)
-            cluster_size += 1
-            if cluster_size >= cluster_size_threshold:
-                break
+
+            if cluster_size_threshold is not None:
+                cluster_size += 1
+                if cluster_size >= cluster_size_threshold:
+                    break
 
     return candidate_pairs_real_ids
 
@@ -218,7 +220,7 @@ def preprocess_input(doc, normalizations):
             if len(gb_pattern) > 0:
                 doc = re.sub('(d+\s*gbbeuk|\d+\s*gbbeu|\d+\s*gb|\d+\s*go|\d+\s*bbeu|\d+\s*gabeu)', ' ', doc)
                 doc = '{} {}'.format(gb_pattern[0].replace(' ', '').replace('go', 'gb').replace('gbbeuk', 'gb').replace('gbbeu', 'gb').replace('bbeu', 'gb'),
-                                     doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first 16 tokens.
+                                     doc)  # Only take the first found pattern --> might lead to problems, but we need to focus on the first tokens.
 
         doc = re.sub('\s\s+', ' ', doc)
 
@@ -292,27 +294,22 @@ if __name__ == '__main__':
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
 
-    stop_words_x1 = ['amazon.com', 'ebay', 'google', 'vology', 'alibaba.com', 'buy', 'cheapest', 'cheap',
-                     'miniprice.ca', 'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '& ', 'abfoto']
-
     k_x_1 = 15
     proj_x_1 = 32
-    normalizations_x_1 = load_normalization()
-    cluster_size_threshold_x1 = 50
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv', normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length, seq_length,
+    normalizations_x_1 = None
+    cluster_size_threshold_x1 = None
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length, seq_length,
                                                                                               proj_x_1), proj_x_1, cluster_size_threshold_x1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    # X2_candidate_pairs = []
-    stop_words_x2 = []
     k_x_2 = 15
     proj_x_2 = 32
-    normalizations_x_2 = load_normalization()
-    cluster_size_threshold_x2 = 10
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv', normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length, seq_length,
+    normalizations_x_2 = None
+    cluster_size_threshold_x2 = None
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length, seq_length,
                                                                                               proj_x_2), proj_x_2, cluster_size_threshold_x2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
