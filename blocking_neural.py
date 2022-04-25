@@ -1,5 +1,5 @@
 import csv
-import itertools
+from itertools import repeat, product
 import logging
 import math
 import re
@@ -19,8 +19,6 @@ from transformers import AutoTokenizer
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
-seq_length = 24
-
 
 def load_normalization():
     """Load Normalization file - Especially for D2"""
@@ -35,7 +33,7 @@ def load_normalization():
 #normalizations = {}
 
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, proj, cluster_size_threshold):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -48,7 +46,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     worker = cpu_count()
     pool = Pool(worker)
-    X['preprocessed'] = pool.starmap(preprocess_input, zip(list(X[attr].values), itertools.repeat(norm)))
+    X['preprocessed'] = pool.starmap(preprocess_input, zip(list(X[attr].values), repeat(norm), repeat(seq_length)))
 
     if path_to_preprocessed_file is not None:
         X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
@@ -166,8 +164,8 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
         real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
         real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
 
-        cluster_size = 0
-        for real_id1, real_id2 in itertools.product(real_group_ids_1, real_group_ids_2):
+        #cluster_size = 0
+        for real_id1, real_id2 in product(real_group_ids_1, real_group_ids_2):
             if real_id1 < real_id2:
                 candidate_pair = (real_id1, real_id2)
             elif real_id1 > real_id2:
@@ -176,15 +174,15 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
                 continue
             candidate_pairs_real_ids.append(candidate_pair)
 
-            if cluster_size_threshold is not None:
-                cluster_size += 1
-                if cluster_size >= cluster_size_threshold:
-                    break
+            # if cluster_size_threshold is not None:
+            #     cluster_size += 1
+            #     if cluster_size >= cluster_size_threshold:
+            #         break
 
     return candidate_pairs_real_ids
 
 
-def preprocess_input(doc, normalizations):
+def preprocess_input(doc, normalizations, seq_length):
     if len(doc) == 0:
         return ''
     else:
@@ -295,22 +293,24 @@ if __name__ == '__main__':
     X_2 = pd.read_csv("X2.csv")
 
     k_x_1 = 15
+    seq_length_x_1 = 32
     proj_x_1 = 32
     normalizations_x_1 = None
-    cluster_size_threshold_x1 = None
+    #cluster_size_threshold_x1 = None
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length, seq_length,
-                                                                                              proj_x_1), proj_x_1, cluster_size_threshold_x1)
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length_x_1, seq_length_x_1,
+                                                                                              proj_x_1), seq_length_x_1, proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     k_x_2 = 15
+    seq_length_x_2 = 24
     proj_x_2 = 32
     normalizations_x_2 = None
-    cluster_size_threshold_x2 = None
+    #cluster_size_threshold_x2 = None
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length, seq_length,
-                                                                                              proj_x_2), proj_x_2, cluster_size_threshold_x2)
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_nonorm.bin'.format(seq_length_x_2, seq_length_x_2,
+                                                                                              proj_x_2), seq_length_x_2, proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
