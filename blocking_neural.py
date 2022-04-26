@@ -120,13 +120,13 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     d = embeddings.shape[1]
     m = 16
     nlist = int(4 * math.sqrt(embeddings.shape[0]))
-    quantizer = faiss.IndexFlatL2(d)
+    quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 80  # Experiment with number of training records
+    no_training_records = nlist * 120  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -138,7 +138,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    faiss_index.nprobe = 10  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = 20  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
@@ -292,8 +292,8 @@ if __name__ == '__main__':
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
 
-    k_x_1 = 30
-    seq_length_x_1 = 24
+    k_x_1 = 45
+    seq_length_x_1 = 32
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    k_x_2 = 30
+    k_x_2 = 45
     seq_length_x_2 = 24
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
