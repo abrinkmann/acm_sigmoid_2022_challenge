@@ -130,3 +130,20 @@ professionnelles,professional
 professionale,professional
 flash,
 xqd xqd,xqd
+windows 8 pro home premium,windows
+windows 8 home premium,windows
+windows 8 pro,windows
+windows 8,windows
+windows8,windows
+win8,windows
+windows 7 pro home premium,windows
+windows 7 home premium,windows
+windows 7 pro,windows
+windows 7,windows
+windows7,windows
+win7 8,windows
+win7,windows
+pro windows,windows
+windowspro,windows
+windows downgrade,windows
+hewlett packard,hp

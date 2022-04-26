@@ -16,7 +16,7 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 
-from blocking import block_with_attr
+#from blocking import block_with_attr
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
@@ -190,9 +190,10 @@ def preprocess_input(docs, normalizations, seq_length):
         doc = ' '.join([str(value) for value in docs if type(value) is str or (type(value) is float and not np.isnan(value))]).lower()
 
         stop_words = ['ebay', 'google', 'vology', 'buy', 'cheapest', 'foto de angelis', 'cheap', 'core',
-                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '\'\'', '""', '\\\\n',
+                      'refurbished', 'wifi', 'best', 'wholesale', 'price', 'hot', '\'\'', '"', '\\\\n',
                       'tesco direct', 'color', ' y ', ' et ', 'tipo a', 'type-a', 'type a', 'informática', ' de ',
-                      ' con ', ' new']
+                      ' con ', 'newest', ' new', ' ram ', '64-bit', '32-bit', 'accessories', 'series', 'touchscreen',
+                      'product', 'customized']
 
         stop_signs = ['&nbsp;', '&quot;', '&amp;', ',', ';', '-', ':', '|', '/', '(', ')', '/', '&']
 
@@ -235,6 +236,9 @@ def preprocess_input(docs, normalizations, seq_length):
             doc = doc.replace('memory card memory', 'memory card')
             doc = doc.replace('memory memory', 'memory')
             doc = doc.replace('card card', 'card')
+            doc = doc.replace('windows windows', 'windows')
+            doc = doc.replace('laptop laptop', 'laptop')
+            doc = doc.replace('hp hp', 'hp')
 
         doc = re.sub('\s\s+', ' ', doc)
         doc = re.sub('\s*$', '', doc)
@@ -286,9 +290,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    # logger.warning('NOT A REAL SUBMISSION!')
-    # expected_cand_size_X1 = 2814
-    # expected_cand_size_X2 = 4392
+    logger.warning('NOT A REAL SUBMISSION!')
+    expected_cand_size_X1 = 2814
+    expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
@@ -298,10 +302,10 @@ if __name__ == '__main__':
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
-    # X2_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-    #                                   'models/supcon/len{}/X2_model_len{}_trans{}_with_price.bin'.format(seq_length_x_1, seq_length_x_1,
-    #                                                                                           proj_x_1), seq_length_x_1, proj_x_1)
-    X1_candidate_pairs = block_with_attr(X_1, "title")
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv', normalizations_x_1, 'supcon',
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
+                                                                                              proj_x_1), seq_length_x_1, proj_x_1)
+    #X1_candidate_pairs = block_with_attr(X_1, "title")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -310,7 +314,7 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
-    X2_candidate_pairs = block_neural(X_2, ["price", "name"], k_x_2, None, normalizations_x_2, 'supcon',
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, 'X2_preprocessed.csv', normalizations_x_2, 'supcon',
                                       'models/supcon/len{}/X2_model_len{}_trans{}_with_4cat.bin'.format(seq_length_x_2, seq_length_x_2,
                                                                                               proj_x_2), seq_length_x_2, proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
