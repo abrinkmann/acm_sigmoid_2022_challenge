@@ -16,6 +16,7 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 
+from blocking import block_with_attr
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
@@ -126,7 +127,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 120  # Experiment with number of training records
+    no_training_records = nlist * 80  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -138,7 +139,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    faiss_index.nprobe = 20  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = 10  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
     D, I = faiss_index.search(embeddings, k_hits)
     logger.info('Collect search results')
@@ -297,9 +298,10 @@ if __name__ == '__main__':
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
-                                                                                              proj_x_1), seq_length_x_1, proj_x_1)
+    # X2_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
+    #                                   'models/supcon/len{}/X2_model_len{}_trans{}_with_price.bin'.format(seq_length_x_1, seq_length_x_1,
+    #                                                                                           proj_x_1), seq_length_x_1, proj_x_1)
+    X1_candidate_pairs = block_with_attr(X_1, "title")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
@@ -308,8 +310,8 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_2, seq_length_x_2,
+    X2_candidate_pairs = block_neural(X_2, ["price", "name"], k_x_2, None, normalizations_x_2, 'supcon',
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_price.bin'.format(seq_length_x_2, seq_length_x_2,
                                                                                               proj_x_2), seq_length_x_2, proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
