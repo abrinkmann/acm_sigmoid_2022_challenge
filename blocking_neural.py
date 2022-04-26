@@ -120,7 +120,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     d = embeddings.shape[1]
     m = 16
     nlist = int(4 * math.sqrt(embeddings.shape[0]))
-    quantizer = faiss.IndexFlatIP(d)
+    quantizer = faiss.IndexFlatL2(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
 
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, 'X1_preprocessed.csv', normalizations_x_1, 'supcon',
+    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
                                       'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
                                                                                               proj_x_1), seq_length_x_1, proj_x_1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
@@ -308,8 +308,8 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
-    X2_candidate_pairs = block_neural(X_2, ["price", "name"], k_x_2, 'X2_preprocessed.csv', normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_price.bin'.format(seq_length_x_2, seq_length_x_2,
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_2, seq_length_x_2,
                                                                                               proj_x_2), seq_length_x_2, proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
