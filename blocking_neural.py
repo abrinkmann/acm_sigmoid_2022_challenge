@@ -310,8 +310,8 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
-    X2_candidate_pairs = block_neural(X_2, ["price", "name"], k_x_2, None, normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_price.bin'.format(seq_length_x_2, seq_length_x_2,
+    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_4cat.bin'.format(seq_length_x_2, seq_length_x_2,
                                                                                               proj_x_2), seq_length_x_2, proj_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
