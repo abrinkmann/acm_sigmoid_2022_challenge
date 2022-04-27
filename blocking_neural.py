@@ -156,13 +156,12 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
                 else:
                     candidate_group_pair = (top_id, index)
 
-                pair2sim[candidate_group_pair] = (1 - distance)
+                pair2sim[candidate_group_pair] = max((1 - distance), pair2sim[candidate_group_pair])
 
     if transitive_closure:
         logger.info('Determine transitive pairs')
-        transitive_candidate_group_pairs = determine_transitive_matches(pair2sim)
-        for pair, sim in tqdm(transitive_candidate_group_pairs):
-            pair2sim[pair] = sim
+        pair2sim = determine_transitive_matches(pair2sim)
+
     candidate_group_pairs = [k for k, _ in sorted(pair2sim.items(), key=lambda k_v: k_v[1], reverse=True)]
 
     logger.info('GroupIds to real ids')
@@ -260,7 +259,6 @@ def preprocess_input(docs, normalizations, seq_length):
 
 def determine_transitive_matches(pairs2sim):
 
-    potential_pairs = defaultdict(float)
     candidate_group_pairs = sorted(list(pairs2sim.keys()))
 
     for j in tqdm(range(len(candidate_group_pairs))):
@@ -279,11 +277,10 @@ def determine_transitive_matches(pairs2sim):
                 else:
                     potential_match = (group_2, group_1)
 
-                if potential_match not in candidate_group_pairs:
-                    match_sim = sum([pairs2sim[first_group], pairs2sim[second_group]]) / 2
-                    potential_pairs[potential_match] = match_sim
+                match_sim = sum([pairs2sim[first_group], pairs2sim[second_group]]) / 2
+                pairs2sim[potential_match] = max(pairs2sim[potential_match], match_sim)
 
-    return list(potential_pairs.items())
+    return pairs2sim
 
 
 def tokenize_input(doc):
