@@ -34,7 +34,7 @@ def load_normalization():
 #normalizations = {}
 
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj, transitive_closure):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -158,6 +158,11 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
                 pair2sim[candidate_group_pair] = (1 - distance)
 
+    if transitive_closure:
+        logger.info('Determine transitive pairs')
+        transitive_candidate_group_pairs = determine_transitive_matches(pair2sim)
+        for pair, sim in tqdm(transitive_candidate_group_pairs):
+            pair2sim[pair] = sim
     candidate_group_pairs = [k for k, _ in sorted(pair2sim.items(), key=lambda k_v: k_v[1], reverse=True)]
 
     logger.info('GroupIds to real ids')
@@ -253,6 +258,34 @@ def preprocess_input(docs, normalizations, seq_length):
         return pattern
 
 
+def determine_transitive_matches(pairs2sim):
+
+    potential_pairs = defaultdict(float)
+    candidate_group_pairs = sorted(list(pairs2sim.keys()))
+
+    for j in tqdm(range(len(candidate_group_pairs))):
+        for k in range(j + 1, len(candidate_group_pairs)):
+            first_group = candidate_group_pairs[j]
+            second_group = candidate_group_pairs[k]
+            if first_group[1] > second_group[0]:
+                break
+
+            matches = sum([1 for element in second_group if element in first_group])
+            if matches > 0:
+                group_1 = [element for element in second_group if element not in first_group][0]
+                group_2 = [element for element in first_group if element not in second_group][0]
+                if group_1 < group_2:
+                    potential_match = (group_1, group_2)
+                else:
+                    potential_match = (group_2, group_1)
+
+                if potential_match not in candidate_group_pairs:
+                    match_sim = sum([pairs2sim[first_group], pairs2sim[second_group]]) / 2
+                    potential_pairs[potential_match] = match_sim
+
+    return list(potential_pairs.items())
+
+
 def tokenize_input(doc):
     return doc[:64]
 
@@ -302,9 +335,10 @@ if __name__ == '__main__':
     proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
+    transitive_closure_x_1 = True
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
                                       'models/supcon/len{}/X1_model_len{}_trans{}.bin'.format(seq_length_x_1, seq_length_x_1,
-                                                                                              proj_x_1), seq_length_x_1, proj_x_1)
+                                                                                              proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1)
     #X1_candidate_pairs = block_with_attr(X_1, "title")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
@@ -314,9 +348,10 @@ if __name__ == '__main__':
     proj_x_2 = 32
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
+    transitive_closure_x_2 = True
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
                                       'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_2, seq_length_x_2,
-                                                                                              proj_x_2), seq_length_x_2, proj_x_2)
+                                                                                              proj_x_2), seq_length_x_2, proj_x_2, transitive_closure_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
