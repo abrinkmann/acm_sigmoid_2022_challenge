@@ -34,7 +34,7 @@ def load_normalization():
 #normalizations = {}
 
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj, transitive_closure):  # replace with your logic.
+def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj, transitive_closure, jaccard_reranking):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -60,6 +60,13 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     pattern2id_1 = defaultdict(list)
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
+
+    if jaccard_reranking:
+        pool = Pool(worker)
+        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
+        pool.close()
+        pool.join()
+
 
     # Prepare pairs deduced from groups while waiting for search results
     # To-DO: Parallel processing of group candidate creation & model loading
@@ -148,6 +155,15 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     if transitive_closure:
         logger.info('Determine transitive pairs')
         pair2sim = determine_transitive_matches(pair2sim)
+
+    if jaccard_reranking:
+        logger.info('Jaccard Reranking')
+        for pair in pair2sim.keys():
+            tokens_1 = tokenized_patterns[pair[0]]
+            tokens_2 = tokenized_patterns[pair[1]]
+            jacc_sim = len(tokens_1.intersection(tokens_2)) / max(len(tokens_1), len(tokens_2))
+
+            pair2sim[pair] = 0.5*pair2sim[pair] + 0.5*jacc_sim
 
     candidate_group_pairs = [k for k, _ in sorted(pair2sim.items(), key=lambda k_v: k_v[1], reverse=True)]
 
@@ -270,6 +286,10 @@ def determine_transitive_matches(pairs2sim):
     return pairs2sim
 
 
+def split_string_tokens(str_value):
+    return set(str_value.split(' '))
+
+
 def tokenize_input(doc):
     return doc[:64]
 
@@ -316,13 +336,14 @@ if __name__ == '__main__':
 
     k_x_1 = 30
     seq_length_x_1 = 32
-    proj_x_1 = 32
+    proj_x_1 = 16
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
     transitive_closure_x_1 = False
+    jaccard_reranking_x_1 = False
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_longtrain.bin'.format(seq_length_x_1, seq_length_x_1,
-                                                                                              proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1)
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
+                                                                                              proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1, jaccard_reranking_x_1)
     #X1_candidate_pairs = block_with_attr(X_1, "title")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
