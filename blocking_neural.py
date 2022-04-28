@@ -369,7 +369,7 @@ if __name__ == '__main__':
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
     transitive_closure_x_2 = False
-    jaccard_reranking_x_2 = True
+    jaccard_reranking_x_2 = False
     #X2_candidate_pairs = block_with_attr(X_2, "name")
     X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
                                       'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_2, seq_length_x_2,
