@@ -15,8 +15,8 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 
-#from blocking import block_with_attr
-from blocking_regex import block_regex
+from blocking import block_with_attr
+#from blocking_regex import block_regex
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
@@ -307,9 +307,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    # logger.warning('NOT A REAL SUBMISSION!')
-    # expected_cand_size_X1 = 2814
-    # expected_cand_size_X2 = 4392
+    logger.warning('NOT A REAL SUBMISSION!')
+    expected_cand_size_X1 = 2814
+    expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
@@ -333,7 +333,7 @@ if __name__ == '__main__':
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
     transitive_closure_x_2 = False
-    X2_candidate_pairs = block_regex(X_2, ["name"], None, normalizations_x_2, 120)
+    X2_candidate_pairs = block_with_attr(X_2, "name")
     # X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
     #                                   'models/supcon/len{}/X2_model_len{}_trans{}.bin'.format(seq_length_x_2, seq_length_x_2,
     #                                                                                           proj_x_2), seq_length_x_2, proj_x_2, transitive_closure_x_2)
