@@ -307,9 +307,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    logger.warning('NOT A REAL SUBMISSION!')
-    expected_cand_size_X1 = 2814
-    expected_cand_size_X2 = 4392
+    # logger.warning('NOT A REAL SUBMISSION!')
+    # expected_cand_size_X1 = 2814
+    # expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
