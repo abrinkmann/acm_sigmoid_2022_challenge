@@ -158,12 +158,20 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     if jaccard_reranking:
         logger.info('Jaccard Reranking')
-        for pair in pair2sim.keys():
-            tokens_1 = tokenized_patterns[pair[0]]
-            tokens_2 = tokenized_patterns[pair[1]]
-            jacc_sim = len(tokens_1.intersection(tokens_2)) / max(len(tokens_1), len(tokens_2))
+        pool = Pool(worker)
+        jaccard_similarities = pool.starmap(calculate_jaccard_sim, zip(list(pair2sim.keys()), repeat(tokenized_patterns)))
+        pool.close()
+        pool.join()
 
-            pair2sim[pair] = 0.5*pair2sim[pair] + 0.5*jacc_sim
+        for pair, jacc_sim in jaccard_similarities:
+            pair2sim[pair] = 0.5 * pair2sim[pair] + 0.5 * jacc_sim
+
+        # for pair in pair2sim.keys():
+        #     tokens_1 = tokenized_patterns[pair[0]]
+        #     tokens_2 = tokenized_patterns[pair[1]]
+        #     jacc_sim = len(tokens_1.intersection(tokens_2)) / max(len(tokens_1), len(tokens_2))
+        #
+        #     pair2sim[pair] = 0.5*pair2sim[pair] + 0.5*jacc_sim
 
     candidate_group_pairs = [k for k, _ in sorted(pair2sim.items(), key=lambda k_v: k_v[1], reverse=True)]
 
@@ -259,6 +267,13 @@ def preprocess_input(docs, normalizations, seq_length):
 
         return pattern
 
+
+def calculate_jaccard_sim(pair, tokenized_patterns):
+    tokens_1 = tokenized_patterns[pair[0]]
+    tokens_2 = tokenized_patterns[pair[1]]
+    jacc_sim = len(tokens_1.intersection(tokens_2)) / max(len(tokens_1), len(tokens_2))
+
+    return pair, jacc_sim
 
 def determine_transitive_matches(pairs2sim):
 
