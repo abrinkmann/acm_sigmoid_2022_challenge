@@ -17,6 +17,7 @@ import pandas as pd
 from transformers import AutoTokenizer
 
 #from blocking import block_with_attr
+from blocking import block_with_attr
 from model_contrastive import ContrastivePretrainModel
 
 tokenizer = AutoTokenizer.from_pretrained('models/sbert_xtremedistil-l6-h256-uncased-mean-cosine-h32')
@@ -329,12 +330,12 @@ if __name__ == '__main__':
 
     k_x_1 = 30
     seq_length_x_1 = 32
-    proj_x_1 = 16
+    proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
     transitive_closure_x_1 = False
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}.bin'.format(seq_length_x_1, seq_length_x_1,
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
                                                                                               proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1)
     #X1_candidate_pairs = block_with_attr(X_1, "title")
     if len(X1_candidate_pairs) > expected_cand_size_X1:
@@ -346,9 +347,10 @@ if __name__ == '__main__':
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
     transitive_closure_x_2 = False
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}.bin'.format(seq_length_x_2, seq_length_x_2,
-                                                                                              proj_x_2), seq_length_x_2, proj_x_2, transitive_closure_x_2)
+    X2_candidate_pairs = block_with_attr(X_2, "name")
+    # X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
+    #                                   'models/supcon/len{}/X2_model_len{}_trans{}.bin'.format(seq_length_x_2, seq_length_x_2,
+    #                                                                                           proj_x_2), seq_length_x_2, proj_x_2, transitive_closure_x_2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
