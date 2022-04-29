@@ -79,10 +79,10 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
     if config['jaccard_reranking']:
         logger.info('Jaccard Reranking')
 
-        pool = Pool(worker)
-        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
-        pool.close()
-        pool.join()
+        #pool = Pool(worker)
+        tokenized_patterns = [split_string_tokens(pattern) for pattern in list(pattern2id_1.keys())]
+        #pool.close()
+        #pool.join()
         logger.info('Jaccard Reranking - Ready')
 
     logger.info('Load Models')
