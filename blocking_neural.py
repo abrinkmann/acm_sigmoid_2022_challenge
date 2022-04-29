@@ -76,15 +76,6 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
             for k in range(j + 1, len(ids)):
                 candidate_pairs_real_ids.append((ids[j], ids[k]))
 
-    if config['jaccard_reranking']:
-        logger.info('Jaccard Reranking')
-
-        #pool = Pool(worker)
-        tokenized_patterns = [split_string_tokens(pattern) for pattern in list(pattern2id_1.keys())]
-        #pool.close()
-        #pool.join()
-        logger.info('Jaccard Reranking - Ready')
-
     logger.info('Load Models')
 
     model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=config['proj'])
@@ -161,11 +152,7 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
     if config['jaccard_reranking']:
         logger.info('Jaccard Reranking')
 
-        pool = Pool(worker)
-        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
-        pool.close()
-        pool.join()
-        logger.info('Jaccard Reranking - Ready')
+        tokenized_patterns = [split_string_tokens(pattern) for pattern in pattern2id_1.keys()]
 
         # pool = Pool(worker)
         # jaccard_similarities = pool.starmap(calculate_jaccard_sim, zip(list(pair2sim.keys()), repeat(tokenized_patterns)))
@@ -380,16 +367,16 @@ if __name__ == '__main__':
     #k_x_2 = 30
     #seq_length_x_2 = 24
     #proj_x_2 = 32
-    configuration_x_2 = {'k': 15,  'seq_length': 24, 'proj': 32,
+    configuration_x_2 = {'k': 30,  'seq_length': 24, 'proj': 32,
                          'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
-                         'transitive_closure': False, 'jaccard_reranking': False}
+                         'transitive_closure': False, 'jaccard_reranking': True}
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
     # transitive_closure_x_2 = False
     # jaccard_reranking_x_2 = False
     #X2_candidate_pairs = block_with_attr(X_2, "name")
     X2_candidate_pairs = block_neural(X_2, ["name"], configuration_x_2, None, normalizations_x_2,
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_lower_lr.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
                                                                                               configuration_x_2['proj']), expected_cand_size_X2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
