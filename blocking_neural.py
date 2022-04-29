@@ -349,7 +349,7 @@ if __name__ == '__main__':
     X_2 = pd.read_csv("X2.csv")
 
     configuration_x_1 = {'k': 30,  'seq_length': 28, 'proj': 32,
-                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
+                         'nlist_factor': 4, 'train_data_factor': 80, 'nprobe': 10,
                          'transitive_closure': False, 'jaccard_reranking': False}
     #k_x_1 = 30
     #seq_length_x_1 = 28
@@ -369,8 +369,8 @@ if __name__ == '__main__':
     #seq_length_x_2 = 24
     #proj_x_2 = 32
     configuration_x_2 = {'k': 30,  'seq_length': 24, 'proj': 32,
-                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
-                         'transitive_closure': False, 'jaccard_reranking': True}
+                         'nlist_factor': 4, 'train_data_factor': 80, 'nprobe': 10,
+                         'transitive_closure': False, 'jaccard_reranking': False}
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
     # transitive_closure_x_2 = False
