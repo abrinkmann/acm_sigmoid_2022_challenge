@@ -34,7 +34,7 @@ def load_normalization():
 #normalizations = {}
 
 
-def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, model_path, seq_length, proj, transitive_closure, jaccard_reranking):  # replace with your logic.
+def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -47,7 +47,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     worker = cpu_count()
     pool = Pool(worker)
-    X['preprocessed'] = pool.starmap(preprocess_input, zip(list(X[attr].values), repeat(norm), repeat(seq_length)))
+    X['preprocessed'] = pool.starmap(preprocess_input, zip(list(X[attr].values), repeat(norm), repeat(config['seq_length'])))
 
     if path_to_preprocessed_file is not None:
         X['tokens'] = pool.map(tokenize_input, tqdm(list(X['preprocessed'].values)))
@@ -60,13 +60,6 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     pattern2id_1 = defaultdict(list)
     for i in tqdm(range(X.shape[0])):
         pattern2id_1[X['preprocessed'][i]].append(X['id'][i])
-
-    if jaccard_reranking:
-        pool = Pool(worker)
-        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
-        pool.close()
-        pool.join()
-
 
     # Prepare pairs deduced from groups while waiting for search results
     # To-DO: Parallel processing of group candidate creation & model loading
@@ -85,7 +78,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     logger.info('Load Models')
 
-    model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=proj)
+    model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=config['proj'])
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
 
@@ -93,7 +86,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     def encode_and_embed(examples):
         with torch.no_grad():
-            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=seq_length,
+            tokenized_input = tokenizer(examples, padding=True, truncation=True, max_length=config['seq_length'],
                                         return_tensors='pt')
             encoded_output = model(input_ids=tokenized_input['input_ids'],
                                    attention_mask=tokenized_input['attention_mask'])
@@ -114,14 +107,14 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     logger.info('Initialize faiss index')
     d = embeddings.shape[1]
     m = 16
-    nlist = int(4 * math.sqrt(embeddings.shape[0]))
+    nlist = int(config['nlist_factor'] * math.sqrt(embeddings.shape[0]))
     quantizer = faiss.IndexFlatIP(d)
     #faiss_index = faiss.IndexIVFFlat(quantizer, d, nlist)
     faiss_index = faiss.IndexIVFPQ(quantizer, d, nlist, m, 8)  # 8 specifies that each sub-vector is encoded as 8 bits
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 80  # Experiment with number of training records
+    no_training_records = nlist * config['train_data_factor']  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -133,15 +126,15 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     faiss_index.add(embeddings)
 
     logger.info("Search products...")
-    faiss_index.nprobe = 10  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
+    faiss_index.nprobe = config['nprobe']  # the number of cells (out of nlist) that are visited to perform a search --> INCREASE if possible
 
-    D, I = faiss_index.search(embeddings, k_hits)
+    D, I = faiss_index.search(embeddings, config['k'])
     logger.info('Collect search results')
     pair2sim = defaultdict(float)
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > -1:
-                if (1 - distance) < 0.25:
+                if (1 - distance) < 0.4:
                     break
                 if index == top_id:
                     continue
@@ -150,14 +143,20 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
                 else:
                     candidate_group_pair = (top_id, index)
 
-                pair2sim[candidate_group_pair] = 1 - distance
+                pair2sim[candidate_group_pair] = max(1 - distance, pair2sim[candidate_group_pair])
 
-    if transitive_closure:
+    if config['transitive_closure']:
         logger.info('Determine transitive pairs')
         pair2sim = determine_transitive_matches(pair2sim)
 
-    if jaccard_reranking:
+    if config['jaccard_reranking']:
         logger.info('Jaccard Reranking')
+
+        pool = Pool(worker)
+        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
+        pool.close()
+        pool.join()
+
         # pool = Pool(worker)
         # jaccard_similarities = pool.starmap(calculate_jaccard_sim, zip(list(pair2sim.keys()), repeat(tokenized_patterns)))
         # pool.close()
@@ -349,31 +348,37 @@ if __name__ == '__main__':
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
 
-    k_x_1 = 30
-    seq_length_x_1 = 28
-    proj_x_1 = 32
+    configuration_x_1 = {'k': 30,  'seq_length': 28, 'proj': 32,
+                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
+                         'transitive_closure': False, 'jaccard_reranking': False}
+    #k_x_1 = 30
+    #seq_length_x_1 = 28
+    #proj_x_1 = 32
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
-    transitive_closure_x_1 = False
-    jaccard_reranking_x_1 = False
-    X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
-                                                                                              proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1, jaccard_reranking_x_1)
+    # transitive_closure_x_1 = False
+    # jaccard_reranking_x_1 = False
+    X1_candidate_pairs = block_neural(X_1, ["title"], configuration_x_1, None, normalizations_x_1,
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(configuration_x_1['seq_length'], configuration_x_1['seq_length'],
+                                                                                              configuration_x_1['proj']))
 
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
-    k_x_2 = 30
-    seq_length_x_2 = 24
-    proj_x_2 = 32
+    #k_x_2 = 30
+    #seq_length_x_2 = 24
+    #proj_x_2 = 32
+    configuration_x_2 = {'k': 30,  'seq_length': 24, 'proj': 32,
+                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10, 'm': 16,
+                         'transitive_closure': False, 'jaccard_reranking': True}
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
-    transitive_closure_x_2 = False
-    jaccard_reranking_x_2 = False
+    # transitive_closure_x_2 = False
+    # jaccard_reranking_x_2 = False
     #X2_candidate_pairs = block_with_attr(X_2, "name")
-    X2_candidate_pairs = block_neural(X_2, ["name"], k_x_2, None, normalizations_x_2, 'supcon',
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_2, seq_length_x_2,
-                                                                                              proj_x_2), seq_length_x_2, proj_x_2, transitive_closure_x_2, jaccard_reranking_x_2)
+    X2_candidate_pairs = block_neural(X_2, ["name"], configuration_x_2, None, normalizations_x_2,
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
+                                                                                              configuration_x_2['proj']))
 
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]

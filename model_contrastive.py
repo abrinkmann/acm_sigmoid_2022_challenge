@@ -26,6 +26,7 @@ class BaseEncoder(nn.Module):
 class ContrastivePretrainModel(nn.Module):
 
     def __init__(self, len_tokenizer, model='models/xtremedistil-l6-h256-uncased', pool=True, proj=32):
+        """Using XtremeDistilTransformers as Base Encoder: https://arxiv.org/abs/2106.04563"""
         super().__init__()
 
         self.pool = pool
