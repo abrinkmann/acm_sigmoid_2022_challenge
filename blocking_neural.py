@@ -76,6 +76,15 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
             for k in range(j + 1, len(ids)):
                 candidate_pairs_real_ids.append((ids[j], ids[k]))
 
+    if config['jaccard_reranking']:
+        logger.info('Jaccard Reranking')
+
+        pool = Pool(worker)
+        tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
+        pool.close()
+        pool.join()
+        logger.info('Jaccard Reranking - Ready')
+
     logger.info('Load Models')
 
     model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=config['proj'])
@@ -156,6 +165,7 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
         tokenized_patterns = pool.map(split_string_tokens, tqdm(list(pattern2id_1.keys())))
         pool.close()
         pool.join()
+        logger.info('Jaccard Reranking - Ready')
 
         # pool = Pool(worker)
         # jaccard_similarities = pool.starmap(calculate_jaccard_sim, zip(list(pair2sim.keys()), repeat(tokenized_patterns)))
