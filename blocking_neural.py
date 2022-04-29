@@ -34,7 +34,7 @@ def load_normalization():
 #normalizations = {}
 
 
-def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path):  # replace with your logic.
+def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, expected_candidate_size):  # replace with your logic.
     '''
     This function performs blocking using elastic search
     :param X: dataframe
@@ -176,6 +176,9 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path): 
 
     logger.info('GroupIds to real ids')
     for pair in tqdm(candidate_group_pairs):
+        if len(candidate_pairs_real_ids) > expected_candidate_size:
+            break
+
         real_group_ids_1 = list(sorted(group2id_1[pair[0]]))
         real_group_ids_2 = list(sorted(group2id_1[pair[1]]))
 
@@ -348,9 +351,9 @@ if __name__ == '__main__':
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
 
-    configuration_x_1 = {'k': 30,  'seq_length': 28, 'proj': 32,
+    configuration_x_1 = {'k': 15,  'seq_length': 28, 'proj': 32,
                          'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
-                         'transitive_closure': False, 'jaccard_reranking': False}
+                         'transitive_closure': False, 'jaccard_reranking': True}
     #k_x_1 = 30
     #seq_length_x_1 = 28
     #proj_x_1 = 32
@@ -360,15 +363,14 @@ if __name__ == '__main__':
     # jaccard_reranking_x_1 = False
     X1_candidate_pairs = block_neural(X_1, ["title"], configuration_x_1, None, normalizations_x_1,
                                       'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_lower_lr.bin'.format(configuration_x_1['seq_length'], configuration_x_1['seq_length'],
-                                                                                              configuration_x_1['proj']))
-
+                                                                                              configuration_x_1['proj']), expected_cand_size_X1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
 
     #k_x_2 = 30
     #seq_length_x_2 = 24
     #proj_x_2 = 32
-    configuration_x_2 = {'k': 30,  'seq_length': 24, 'proj': 32,
+    configuration_x_2 = {'k': 15,  'seq_length': 24, 'proj': 32,
                          'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
                          'transitive_closure': False, 'jaccard_reranking': False}
     normalizations_x_2 = normalizations_x_1
@@ -378,8 +380,7 @@ if __name__ == '__main__':
     #X2_candidate_pairs = block_with_attr(X_2, "name")
     X2_candidate_pairs = block_neural(X_2, ["name"], configuration_x_2, None, normalizations_x_2,
                                       'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_lower_lr.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
-                                                                                              configuration_x_2['proj']))
-
+                                                                                              configuration_x_2['proj']), expected_cand_size_X2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
 
