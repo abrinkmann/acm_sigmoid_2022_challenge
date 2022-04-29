@@ -121,7 +121,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
 
     assert not faiss_index.is_trained
     logger.info('Train Faiss Index')
-    no_training_records = nlist * 40  # Experiment with number of training records
+    no_training_records = nlist * 80  # Experiment with number of training records
     if embeddings.shape[0] < no_training_records:
         faiss_index.train(embeddings)
     else:
@@ -141,7 +141,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > -1:
-                if (1 - distance) < 0.25:
+                if (1 - distance) < 0.4:
                     break
                 if index == top_id:
                     continue
@@ -150,7 +150,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
                 else:
                     candidate_group_pair = (top_id, index)
 
-                pair2sim[candidate_group_pair] = max((1 - distance), pair2sim[candidate_group_pair])
+                pair2sim[candidate_group_pair] = 1 - distance
 
     if transitive_closure:
         logger.info('Determine transitive pairs')
@@ -342,9 +342,9 @@ if __name__ == '__main__':
     expected_cand_size_X2 = 2000000
 
     # Local Testing - COMMENT FOR SUBMISSION!
-    # logger.warning('NOT A REAL SUBMISSION!')
-    # expected_cand_size_X1 = 2814
-    # expected_cand_size_X2 = 4392
+    logger.warning('NOT A REAL SUBMISSION!')
+    expected_cand_size_X1 = 2814
+    expected_cand_size_X2 = 4392
 
     X_1 = pd.read_csv("X1.csv")
     X_2 = pd.read_csv("X2.csv")
@@ -355,7 +355,7 @@ if __name__ == '__main__':
     normalizations_x_1 = load_normalization()
     #cluster_size_threshold_x1 = None
     transitive_closure_x_1 = False
-    jaccard_reranking_x_1 = True
+    jaccard_reranking_x_1 = False
     X1_candidate_pairs = block_neural(X_1, ["title"], k_x_1, None, normalizations_x_1, 'supcon',
                                       'models/supcon/len{}/X1_model_len{}_trans{}_with_computers.bin'.format(seq_length_x_1, seq_length_x_1,
                                                                                               proj_x_1), seq_length_x_1, proj_x_1, transitive_closure_x_1, jaccard_reranking_x_1)
