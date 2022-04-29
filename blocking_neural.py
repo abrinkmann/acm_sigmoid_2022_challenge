@@ -141,7 +141,7 @@ def block_neural(X, attr, k_hits, path_to_preprocessed_file, norm, model_type, m
     for index in tqdm(range(len(I))):
         for distance, top_id in zip(D[index], I[index]):
             if top_id > -1:
-                if (1 - distance) < 0.4:
+                if (1 - distance) < 0.25:
                     break
                 if index == top_id:
                     continue
