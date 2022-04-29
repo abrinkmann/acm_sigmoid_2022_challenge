@@ -79,7 +79,7 @@ def block_neural(X, attr, config, path_to_preprocessed_file, norm, model_path, e
     logger.info('Load Models')
 
     model = ContrastivePretrainModel(len_tokenizer=len(tokenizer), proj=config['proj'])
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')), strict=False)
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
 
     logger.info("Encode & Embed entities...")
@@ -349,7 +349,7 @@ if __name__ == '__main__':
     X_2 = pd.read_csv("X2.csv")
 
     configuration_x_1 = {'k': 30,  'seq_length': 28, 'proj': 32,
-                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
+                         'nlist_factor': 4, 'train_data_factor': 200, 'nprobe': 20,
                          'transitive_closure': False, 'jaccard_reranking': True}
     #k_x_1 = 30
     #seq_length_x_1 = 28
@@ -359,7 +359,7 @@ if __name__ == '__main__':
     # transitive_closure_x_1 = False
     # jaccard_reranking_x_1 = False
     X1_candidate_pairs = block_neural(X_1, ["title"], configuration_x_1, None, normalizations_x_1,
-                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_combinedloss.bin'.format(configuration_x_1['seq_length'], configuration_x_1['seq_length'],
+                                      'models/supcon/len{}/X1_model_len{}_trans{}_with_computers_lower_lr.bin'.format(configuration_x_1['seq_length'], configuration_x_1['seq_length'],
                                                                                               configuration_x_1['proj']), expected_cand_size_X1)
     if len(X1_candidate_pairs) > expected_cand_size_X1:
         X1_candidate_pairs = X1_candidate_pairs[:expected_cand_size_X1]
@@ -368,7 +368,7 @@ if __name__ == '__main__':
     #seq_length_x_2 = 24
     #proj_x_2 = 32
     configuration_x_2 = {'k': 30,  'seq_length': 24, 'proj': 32,
-                         'nlist_factor': 4, 'train_data_factor': 40, 'nprobe': 10,
+                         'nlist_factor': 4, 'train_data_factor': 200, 'nprobe': 20,
                          'transitive_closure': False, 'jaccard_reranking': True}
     normalizations_x_2 = normalizations_x_1
     #cluster_size_threshold_x2 = None
@@ -376,7 +376,7 @@ if __name__ == '__main__':
     # jaccard_reranking_x_2 = False
     #X2_candidate_pairs = block_with_attr(X_2, "name")
     X2_candidate_pairs = block_neural(X_2, ["name"], configuration_x_2, None, normalizations_x_2,
-                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers_combinedloss.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
+                                      'models/supcon/len{}/X2_model_len{}_trans{}_with_computers.bin'.format(configuration_x_2['seq_length'], configuration_x_2['seq_length'],
                                                                                               configuration_x_2['proj']), expected_cand_size_X2)
     if len(X2_candidate_pairs) > expected_cand_size_X2:
         X2_candidate_pairs = X2_candidate_pairs[:expected_cand_size_X2]
