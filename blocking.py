@@ -101,13 +101,13 @@ def save_output(X1_candidate_pairs,
 
 
 
-# # read the datasets
-# X1 = pd.read_csv("X1.csv")
-# X2 = pd.read_csv("X2.csv")
-#
-# # perform blocking
-# X1_candidate_pairs = block_with_attr(X1, attr="title")
-# X2_candidate_pairs = block_with_attr(X2, attr="name")
-#
-# # save results
-# save_output(X1_candidate_pairs, X2_candidate_pairs)
+# read the datasets
+X1 = pd.read_csv("X1.csv")
+X2 = pd.read_csv("X2.csv")
+
+# perform blocking
+X1_candidate_pairs = block_with_attr(X1, attr="title")
+X2_candidate_pairs = block_with_attr(X2, attr="name")
+
+# save results
+save_output(X1_candidate_pairs, X2_candidate_pairs)

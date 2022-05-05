@@ -1,4 +1,26 @@
-# acm_sigmoid_2022_challenge
+# ACM Sigmod Programming Contest - Team WBSG
+
+This repository contains code and relevant instructions to reproduce our final submission for the [ACM Sigmod Programming Contest 2022](http://sigmod2022contest.eastus.cloudapp.azure.com/index.shtml).
+
+## Blocking System
+
+* **Requirements**
+
+    [Pip](https://pypi.org/project/pip/)
+
+* **Building the python environment using pip**
+
+    To build the python environment used for the submissions, navigate to the project root folder where the file *requirements.txt* is located and run `pip3 install -r requirements.txt`.
+
+* **Reproducing our final submission**
+
+    To reproduce our final submission, please run `python3 blocking_neural.py` in the root folder.
+    The script produces the requested `output.csv`, which is used for the evaluation of the blocking system.
+
+    
+## (Optional) Training the contrastive model
+
+The checkpoints of the trained models are included in this repository in the `models/` folder. It is not necessary to rerun the training for the blocking system to work. If you specifically want to replicate the training, follow these steps:
 
 * **Requirements**
 
@@ -7,10 +29,6 @@
 * **Building the conda environment**
 
     To build the conda environment used for the challenge, navigate to the project root folder where the file *sigmod.yml* is located and run `conda env create -f sigmod.yml`
-    
-## (Optional) Training the contrastive model
-
-The checkpoints of the trained models are included in this repository in the `models/` folder. It is not necessary to rerun the training for the blocking system to work. If you specifically want to replicate the training, follow these steps:
 
 * **Install project as package**
 
