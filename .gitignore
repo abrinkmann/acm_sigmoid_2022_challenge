@@ -1,1 +1,5 @@
 .idea/
+data/
+reports/
+src.egg-info/
+output.csv
