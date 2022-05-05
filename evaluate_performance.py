@@ -1,12 +1,18 @@
 # Load Data
 from tqdm import tqdm
 
-from utils import collect_pairs_from_file
+def collect_pairs_from_file(file_name):
+    pairs = []
+    with open(file_name) as file:
+        for line in tqdm(file.readlines()):
+            pair_values = line.replace('\n', '').split(',')
+            pairs.append('{}-{}'.format(pair_values[0], pair_values[1]))
+    return pairs
 
 print('Load pairs')
-output_pairs = collect_pairs_from_file('../output.csv')
-y1_pairs = collect_pairs_from_file('../Y1.csv')
-y2_pairs = collect_pairs_from_file('../Y2.csv')
+output_pairs = collect_pairs_from_file('output.csv')
+y1_pairs = collect_pairs_from_file('Y1.csv')
+y2_pairs = collect_pairs_from_file('Y2.csv')
 
 # Remove 0,0 pairs from output_pairs
 output_pairs = [output_pair for output_pair in output_pairs if output_pair != '0-0']
