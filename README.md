@@ -6,11 +6,13 @@ This repository contains code and relevant instructions to reproduce our final s
 
 * **Requirements**
 
-    [Pip](https://pypi.org/project/pip/)
+    [Pip](https://pypi.org/project/pip/) or [Anaconda3](https://www.anaconda.com/products/individual)
+
 
 * **Building the python environment using pip**
 
     To build the python environment used for the submissions, navigate to the project root folder where the file *requirements.txt* is located and run `pip3 install -r requirements.txt`.
+
 
 * **Reproducing our final submission**
 
