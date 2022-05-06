@@ -49,6 +49,7 @@ dependencies:
   - mkl_random=1.2.2=py39h51133e4_0
   - ncurses=6.3=h7f8727e_2
   - nettle=3.7.3=hbbd107a_1
+  - nltk=3.7=pyhd3eb1b0_0
   - numexpr=2.8.1=py39h6abb31d_0
   - numpy=1.21.5=py39he7a7128_2
   - numpy-base=1.21.5=py39hf524024_2
@@ -77,6 +78,7 @@ dependencies:
   - tk=8.6.11=h1ccaba5_0
   - torchaudio=0.11.0=py39_cu113
   - torchvision=0.12.0=py39_cu113
+  - tqdm=4.64.0=py39h06a4308_0
   - typing_extensions=4.1.1=pyh06a4308_0
   - tzdata=2022a=hda174b7_0
   - urllib3=1.26.9=py39h06a4308_0
@@ -93,6 +95,5 @@ dependencies:
     - regex==2022.4.24
     - sacremoses==0.0.53
     - tokenizers==0.12.1
-    - tqdm==4.64.0
     - transformers==4.18.0
 prefix: /work-ceph/rpeeters/anaconda3/envs/sigmod
