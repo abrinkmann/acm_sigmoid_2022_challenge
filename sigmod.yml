@@ -1,4 +1,4 @@
-name: sigmodsubmission
+name: sigmod
 channels:
   - pytorch
   - defaults
@@ -95,4 +95,4 @@ dependencies:
     - tokenizers==0.12.1
     - tqdm==4.64.0
     - transformers==4.18.0
-prefix: /work-ceph/rpeeters/anaconda3/envs/sigmodsubmission
+prefix: /work-ceph/rpeeters/anaconda3/envs/sigmod
