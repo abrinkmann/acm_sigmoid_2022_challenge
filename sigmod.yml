@@ -95,6 +95,4 @@ dependencies:
     - tokenizers==0.12.1
     - tqdm==4.64.0
     - transformers==4.18.0
-    - psutil==5.9.0
-    - faiss-cpu=1.7.2
 prefix: /work-ceph/rpeeters/anaconda3/envs/sigmodsubmission
