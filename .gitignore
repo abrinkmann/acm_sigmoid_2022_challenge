@@ -2,4 +2,5 @@
 /data/
 /reports/
 /src.egg-info/
+__pycache_/
 output.csv
